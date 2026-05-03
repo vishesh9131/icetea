@@ -32,14 +32,13 @@ def test_settings_vllm_defaults_point_at_corerec(monkeypatch):
     assert s.active_model == s.vllm_model
 
 
-def test_openai_provider_without_key_raises_clearly(monkeypatch):
-    monkeypatch.setenv("LLM_PROVIDER", "openai")
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    reset_settings_cache()
-    reset_llm_client()
+def test_openai_provider_without_key_raises_clearly():
+    # pass a Settings object directly so pydantic-settings never touches .env
+    # (monkeypatching env alone won't work when .env contains the key)
+    s = Settings(llm_provider="openai", openai_api_key=None)
     from src.llm import OpenAICompatClient
     with pytest.raises(LLMError):
-        OpenAICompatClient()
+        OpenAICompatClient(settings=s)
 
 
 def test_vllm_provider_uses_vllm_base_url(monkeypatch):

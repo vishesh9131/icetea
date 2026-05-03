@@ -63,8 +63,42 @@ class Classification:
     error: str | None = None
 
 
-# Stable JSON schema. We hand it to OpenAI's structured-output endpoint when
-# we can; for VLLM we just shove it into the prompt and rely on json mode.
+# JSON schema for OpenAI `response_format.type=json_schema` with strict=True.
+# Every object must set additionalProperties:false, and every property must
+# appear in that object's `required` array (OpenAI rejects otherwise — see 400
+# on gpt-4.1: "additionalProperties is required to be ... false").
+# Optional entity fields use null; list fields are always present (may be []).
+_ENTITY_KEYS: tuple[str, ...] = (
+    "tickers",
+    "topics",
+    "sectors",
+    "amount",
+    "currency",
+    "rate",
+    "period_years",
+    "frequency",
+    "horizon",
+    "time_period",
+    "index",
+    "action",
+    "goal",
+)
+_ENTITY_PROPERTIES: dict[str, Any] = {
+    "tickers": {"type": "array", "items": {"type": "string"}},
+    "topics": {"type": "array", "items": {"type": "string"}},
+    "sectors": {"type": "array", "items": {"type": "string"}},
+    "amount": {"type": ["number", "null"]},
+    "currency": {"type": ["string", "null"]},
+    "rate": {"type": ["number", "null"]},
+    "period_years": {"type": ["integer", "null"]},
+    "frequency": {"type": ["string", "null"]},
+    "horizon": {"type": ["string", "null"]},
+    "time_period": {"type": ["string", "null"]},
+    "index": {"type": ["string", "null"]},
+    "action": {"type": ["string", "null"]},
+    "goal": {"type": ["string", "null"]},
+}
+
 CLASSIFIER_SCHEMA: dict[str, Any] = {
     "title": "intent_classification",
     "type": "object",
@@ -76,22 +110,9 @@ CLASSIFIER_SCHEMA: dict[str, Any] = {
         "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
         "entities": {
             "type": "object",
-            "additionalProperties": True,
-            "properties": {
-                "tickers": {"type": "array", "items": {"type": "string"}},
-                "topics": {"type": "array", "items": {"type": "string"}},
-                "sectors": {"type": "array", "items": {"type": "string"}},
-                "amount": {"type": "number"},
-                "currency": {"type": "string"},
-                "rate": {"type": "number"},
-                "period_years": {"type": "integer"},
-                "frequency": {"type": "string"},
-                "horizon": {"type": "string"},
-                "time_period": {"type": "string"},
-                "index": {"type": "string"},
-                "action": {"type": "string"},
-                "goal": {"type": "string"},
-            },
+            "additionalProperties": False,
+            "required": list(_ENTITY_KEYS),
+            "properties": _ENTITY_PROPERTIES,
         },
         "safety_verdict": {
             "type": "object",
@@ -200,6 +221,10 @@ def _coerce(payload: dict[str, Any]) -> Classification:
     tickers = entities.get("tickers")
     if isinstance(tickers, list):
         entities["tickers"] = [str(t).upper() for t in tickers if str(t).strip()]
+
+    # OpenAI strict schema forces every entity key to be present; drop nulls
+    # so downstream behaves like "field omitted".
+    entities = {k: v for k, v in entities.items() if v is not None}
 
     safety = payload.get("safety_verdict") or {"category": None, "rationale": ""}
     if not isinstance(safety, dict):

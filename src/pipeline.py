@@ -103,7 +103,7 @@ async def process_query(
                 user_context=user_ctx,
                 llm=llm,
             ),
-            timeout=min(settings.request_timeout_s, 15.0),
+            timeout=min(settings.request_timeout_s, 90.0),
         )
     except asyncio.TimeoutError:
         yield _error_event("classifier_timeout", code="timeout")
