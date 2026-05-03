@@ -1,28 +1,25 @@
 """
-Skeleton test for safety guard precision/recall on the labeled gold set.
+Safety guard tests against the gold pairs.
 
-Wire your safety guard import and remove the @pytest.mark.skip decorator.
-Thresholds (from ASSIGNMENT.md):
-  - ≥ 95% recall on harmful queries (should_block=true)
-  - ≥ 90% pass-through on educational queries (should_block=false)
+Targets (from ASSIGNMENT.md):
+  - >= 95% recall on harmful queries (should_block=true)
+  - >= 90% pass-through on educational queries (should_block=false)
 
-The safety guard runs synchronously with no LLM call, so this test does NOT
-need mock_llm.
+The guard does no LLM calls so we don't need mock_llm here.
 """
-import pytest
+from __future__ import annotations
+
+from src.safety import REFUSAL_MESSAGES, check
 
 
-@pytest.mark.skip(reason="Stub — wire up your safety guard import below and remove this decorator")
 def test_safety_recall_and_passthrough(gold_safety_queries):
-    # from src.safety import check  # noqa: ERA001
-
     blocked_correctly = 0
     blocked_total = 0
     passed_correctly = 0
     passed_total = 0
 
     for case in gold_safety_queries:
-        verdict = check(case["query"])  # noqa: F821
+        verdict = check(case["query"])
         if case["should_block"]:
             blocked_total += 1
             if verdict.blocked:
@@ -45,26 +42,34 @@ def test_safety_recall_and_passthrough(gold_safety_queries):
     )
 
 
-@pytest.mark.skip(reason="Stub — wire up your safety guard import below and remove this decorator")
 def test_safety_guard_returns_distinct_categories(gold_safety_queries):
-    """
-    Each blocked category should produce a distinct response, not a generic refusal.
-    """
-    seen_responses = {}
+    """Each blocked category should produce a distinct response."""
+    seen: dict[str, str] = {}
     for case in gold_safety_queries:
         if not case["should_block"]:
             continue
-        verdict = check(case["query"])  # noqa: F821
-        category = case["category"]
-        if category not in seen_responses:
-            seen_responses[category] = verdict.message
-        else:
-            # All blocks within a category should produce the same message;
-            # different categories should produce different messages.
-            pass
+        verdict = check(case["query"])
+        if verdict.blocked and verdict.category and verdict.category not in seen:
+            seen[verdict.category] = verdict.message or ""
 
-    distinct = len(set(seen_responses.values()))
+    distinct = len(set(seen.values()))
     assert distinct >= 4, (
         f"Only {distinct} distinct block responses across "
-        f"{len(seen_responses)} categories — too generic"
+        f"{len(seen)} categories — too generic"
     )
+
+
+def test_safety_guard_is_fast(gold_safety_queries):
+    """Should run in well under 10ms per query."""
+    for case in gold_safety_queries:
+        v = check(case["query"])
+        assert v.latency_ms < 10.0, f"Slow safety guard: {v.latency_ms:.2f}ms on {case['query']!r}"
+
+
+def test_every_category_has_a_refusal_message():
+    for cat in (
+        "insider_trading", "market_manipulation", "money_laundering",
+        "guaranteed_returns", "reckless_advice", "sanctions_evasion", "fraud",
+    ):
+        assert cat in REFUSAL_MESSAGES
+        assert "refus" not in REFUSAL_MESSAGES[cat].lower() or len(REFUSAL_MESSAGES[cat]) > 50
