@@ -13,6 +13,7 @@ from .base import Agent
 from .financial_planner import FinancialPlannerAgent
 from .investment_debate import InvestmentDebateAgent
 from .investment_strategy import InvestmentStrategyAgent
+from .market_research import MarketResearchAgent
 from .portfolio_health import PortfolioHealthAgent
 from .product_recommendation import ProductRecommendationAgent
 from .risk_assessment import RiskAssessmentAgent
@@ -28,6 +29,7 @@ _REAL: dict[str, Agent] = {
     "investment_debate": InvestmentDebateAgent(),
     "investment_strategy": InvestmentStrategyAgent(),
     "risk_assessment": RiskAssessmentAgent(),
+    "market_research": MarketResearchAgent(),
 }
 
 

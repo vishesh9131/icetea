@@ -1363,12 +1363,15 @@ async def _iter_agent_team_discussion(
     if _use_llm_collab(llm):
         assert isinstance(llm, LLMClient)
         try:
-            async for piece in collab_llm.stream_chair_from_transcript(
+            async for channel, piece in collab_llm.stream_chair_from_transcript(
                 llm,
                 query=query,
                 transcript=transcript,
                 shared_facts=shared,
             ):
+                if channel == "think":
+                    yield {"type": "thinking", "delta": piece}
+                    continue
                 buf.append(piece)
                 streamed = True
                 yield {"type": "data", "delta": piece}
@@ -1794,7 +1797,7 @@ async def run_collaborative_supervisor(
         risk_pack = risk_lm or _stub_agent(risk_entry.get("utterance") or "")
         mom_pack = mom_lm or _stub_agent(mom_entry.get("utterance") or "")
         try:
-            async for piece in collab_llm.stream_chair_answer(
+            async for channel, piece in collab_llm.stream_chair_answer(
                 llm,
                 query=query,
                 portfolio_analyst=portfolio_pack,
@@ -1802,6 +1805,9 @@ async def run_collaborative_supervisor(
                 risk_analyst=risk_pack,
                 momentum_analyst=mom_pack,
             ):
+                if channel == "think":
+                    yield {"type": "thinking", "delta": piece}
+                    continue
                 buf.append(piece)
                 yield {"type": "data", "delta": piece}
         except LLMError as exc:

@@ -13,6 +13,7 @@ import re
 from typing import Any, AsyncIterator
 
 from ..llm import LLMError, assemble_messages, get_llm_client
+from ._streaming import stream_pieces
 from ..safety import MODEL_INJECTION_GUARD
 
 
@@ -20,7 +21,10 @@ logger = logging.getLogger(__name__)
 
 
 _NOT_IMPLEMENTED_FRIENDLY = {
-    "market_research":        "I'd normally pull live market data, news, and a quick read on this one — but the market research agent isn't wired up in this build yet.",
+    # market_research is now a real agent (see agents/market_research.py) -
+    # this line is kept only as a defensive fallback should the registry get
+    # mis-wired in a future refactor.
+    "market_research":        "Live market lookup is normally handled by the market_research agent - if you see this line, routing fell through unexpectedly.",
     "financial_planning":     "Planning conversations normally route to the financial planner agent — if you see this line, routing fell through unexpectedly.",
     "financial_calculator":   "Numerical calculations (DCA, mortgage, future value, FX) are handled by a dedicated calculator — not implemented in this build.",
     "risk_assessment":        "Risk metrics like beta, drawdown, and stress tests come from a dedicated risk agent — not implemented in this build.",
@@ -164,13 +168,28 @@ async def _general_query_stub_stream(
             system=_GENERAL_QUERY_SYSTEM + tail_hint,
             history=hist,
         )
+        had_content = False
         try:
-            # always stream from model when we have a client — no canned recap shortcut
-            async for piece in client.stream_text(messages, temperature=0.3, max_tokens=450):
+            # bumped from 450 -> 1200 so thinking-capable models still have
+            # budget for the actual answer after CoT
+            async for channel, piece in stream_pieces(
+                client, messages, temperature=0.3, max_tokens=1200
+            ):
+                if channel == "think":
+                    yield {"type": "thinking", "delta": piece}
+                    continue
+                had_content = True
                 narrative_parts.append(piece)
                 yield {"type": "data", "delta": piece}
         except LLMError as exc:
             logger.warning("General-query stub LLM stream failed: %s", exc)
+            fallback = _offline_reply_from_thread(query, hist)
+            narrative_parts.append(fallback)
+            yield {"type": "data", "delta": fallback}
+            had_content = True
+        if not had_content:
+            # CoT burned the budget; replay the conversation deterministically
+            # so the user does not see a thinking-only bubble
             fallback = _offline_reply_from_thread(query, hist)
             narrative_parts.append(fallback)
             yield {"type": "data", "delta": fallback}

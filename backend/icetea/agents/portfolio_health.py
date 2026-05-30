@@ -33,6 +33,7 @@ from datetime import datetime, timezone
 from typing import Any, AsyncIterator
 
 from ..llm import LLMClient, LLMError, assemble_messages, get_llm_client
+from ._streaming import stream_pieces
 from ..safety import MODEL_INJECTION_GUARD
 from ..market_data import (
     benchmark_ticker,
@@ -583,11 +584,27 @@ class PortfolioHealthAgent:
             history=hist,
             user=_build_narrative_user_msg(query, structured, user_context),
         )
+        had_content = False
         try:
-            async for piece in client.stream_text(messages, temperature=0.3, max_tokens=300):
+            # bumped from 300 -> 700 to leave headroom for the answer after
+            # thinking-capable models burn tokens on chain-of-thought
+            async for channel, piece in stream_pieces(
+                client, messages, temperature=0.3, max_tokens=700
+            ):
+                if channel == "think":
+                    yield {"type": "thinking", "delta": piece}
+                    continue
+                had_content = True
                 yield {"type": "data", "delta": piece}
         except LLMError as exc:
             logger.warning("Narrative LLM stream failed: %s", exc)
+            intro = _deterministic_intro(structured)
+            for chunk in _split_for_stream(intro):
+                yield {"type": "data", "delta": chunk}
+            had_content = True
+
+        if not had_content:
+            # fall back when CoT consumed the budget without producing an answer
             intro = _deterministic_intro(structured)
             for chunk in _split_for_stream(intro):
                 yield {"type": "data", "delta": chunk}

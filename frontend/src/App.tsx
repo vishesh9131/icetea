@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
+import { ActivityBar } from './components/ActivityBar'
 import { AgentBuilder } from './components/AgentBuilder'
 import { AgentTracePanel } from './components/AgentTracePanel'
 import { ChatPanel } from './components/ChatPanel'
@@ -17,7 +18,15 @@ import { TILE_IDS, type TileId } from './dock/layout'
 import { useDockLayout } from './dock/useDockLayout'
 import { OnboardingFlow, type OnboardingResult } from './onboarding/OnboardingFlow'
 import { defaultProfile, getProfiles, loadProfiles, type Profile } from './profiles'
-import { pingHealth, streamChat, type HealthInfo, type NewsItem, type StreamHandle } from './sseClient'
+import {
+  pingHealth,
+  setLlmProvider,
+  streamChat,
+  type HealthInfo,
+  type LlmProviderId,
+  type NewsItem,
+  type StreamHandle,
+} from './sseClient'
 import type { ChatMessage, TraceEntry, UserContext } from './types'
 import { useTheme } from './useTheme'
 
@@ -26,6 +35,25 @@ const SESSION_PREFIX = 'term'
 // Bumped to v2 if the onboarding shape changes - this is the localStorage
 // key we check to decide whether to show the first-run overlay.
 const ONBOARDING_KEY = 'icetea.onboarded.v1'
+// Operator's chosen LLM provider, sync'd to the backend on every page load
+// so a refresh doesnt silently revert the active provider to whatever the
+// env-declared default was.
+const PROVIDER_KEY = 'icetea.llm_provider'
+
+function readSavedProvider(): LlmProviderId | null {
+  try {
+    const v = window.localStorage.getItem(PROVIDER_KEY)
+    if (v === 'vllm' || v === 'openai' || v === 'claude') return v
+    return null
+  } catch { return null }
+}
+
+function writeSavedProvider(p: LlmProviderId | null) {
+  try {
+    if (p) window.localStorage.setItem(PROVIDER_KEY, p)
+    else window.localStorage.removeItem(PROVIDER_KEY)
+  } catch { /* ignore */ }
+}
 
 function readOnboardingFlag(): boolean {
   try {
@@ -104,6 +132,19 @@ export function App() {
         name: res.name || picked.ctx.name || null,
       }
       setCtx(ctxWithName)
+    }
+    // Push the chosen provider to the backend so /v1/chat hits the right
+    // upstream from the very first turn. Fire and forget - if the switch
+    // fails (eg. server missing the key) we just keep whatever the env
+    // declared and surface the failure on the next health poll.
+    if (res.llmProvider) {
+      writeSavedProvider(res.llmProvider)
+      setLlmProvider(res.llmProvider).then((r) => {
+        if (r.ok) {
+          // optimistically reflect new provider/model in the header strip
+          setHealth((prev) => prev ? { ...prev, llm_provider: r.provider, model: r.model } : prev)
+        }
+      })
     }
     writeOnboardingFlag(true)
     setOnboardingDone(true)
@@ -227,11 +268,26 @@ export function App() {
   // ---- backend health probe ------------------------------------------
   useEffect(() => {
     let stopped = false
+    let syncedProvider = false
     const probe = async () => {
       const h = await pingHealth()
       if (stopped) return
       setOnline(!!h)
       if (h) setHealth(h)
+      // Once the backend is up, push the operator's saved provider once
+      // per page-load so a uvicorn restart doesnt silently revert to the
+      // env-default while the UI keeps showing their choice.
+      if (h && !syncedProvider) {
+        syncedProvider = true
+        const saved = readSavedProvider()
+        if (saved && saved !== h.llm_provider) {
+          setLlmProvider(saved).then((r) => {
+            if (r.ok) {
+              setHealth((prev) => prev ? { ...prev, llm_provider: r.provider, model: r.model } : prev)
+            }
+          })
+        }
+      }
     }
     probe()
     const i = setInterval(probe, 10_000)
@@ -304,11 +360,36 @@ export function App() {
         onOpen: () => pushTrace({ kind: 'meta', label: 'OPEN', body: '/v1/chat' }),
         onEvent: (ev) => {
           if (ev.kind === 'token') {
-            setMessages((prev) => prev.map((m) => m.id === botId
-              ? { ...m, text: m.text + ev.delta, progress: null }
-              : m,
-            ))
+            setMessages((prev) => prev.map((m) => {
+              if (m.id !== botId) return m
+              // Only auto-collapse on the very first content token. After
+              // that we leave thinkingOpen alone so the user can re-open
+              // the panel mid-answer and have it stay open.
+              const isFirstContent = m.text.length === 0
+              return {
+                ...m,
+                text: m.text + ev.delta,
+                progress: null,
+                thinkingOpen: isFirstContent ? false : m.thinkingOpen,
+              }
+            }))
             // we do NOT trace every token — too noisy. Just count rough chunks.
+            return
+          }
+          if (ev.kind === 'thinking') {
+            setMessages((prev) => prev.map((m) => {
+              if (m.id !== botId) return m
+              // First thinking piece -> open the panel by default so the
+              // user can watch the chain-of-thought stream in. Subsequent
+              // pieces leave whatever state the user has set in place.
+              const wasEmpty = !m.thinking
+              return {
+                ...m,
+                thinking: (m.thinking || '') + ev.delta,
+                thinkingOpen: wasEmpty ? true : m.thinkingOpen,
+                progress: null,
+              }
+            }))
             return
           }
           if (ev.kind === 'meta') {
@@ -417,7 +498,7 @@ export function App() {
 
   // ---- command bar action router -------------------------------------
   const onAction = useCallback((a: CommandAction) => {
-    if (a.kind === 'send') send(a.text)
+    if (a.kind === 'send') send(a.text, a.agent_override ? { agent_override: a.agent_override } : undefined)
     else if (a.kind === 'cancel') streamRef.current?.abort()
     else if (a.kind === 'clear') {
       setMessages([])
@@ -489,7 +570,13 @@ Pipeline
         onToggleCollapse={() => dock.toggleCollapsed('chat')}
         onFocus={() => setFocusedTile('chat')}
       >
-        <ChatPanel messages={messages} streaming={busy} />
+        <ChatPanel
+          messages={messages}
+          streaming={busy}
+          onToggleThinking={(id) => setMessages((prev) => prev.map((m) =>
+            m.id === id ? { ...m, thinkingOpen: !m.thinkingOpen } : m,
+          ))}
+        />
       </PanelFrame>
     ),
     portfolio: (
@@ -607,6 +694,22 @@ Pipeline
 
   return (
     <div className="terminal">
+      <ActivityBar
+        theme={theme}
+        onThemeChange={setTheme}
+        collaborative={collaborative}
+        onToggleCollab={() => setCollab((v) => !v)}
+        onResetLayout={() => dock.reset()}
+        onClearTranscript={() => onAction({ kind: 'clear' })}
+        onReplayOnboarding={() => {
+          writeOnboardingFlag(false)
+          setOnboardingDone(false)
+        }}
+        onOpenBuilder={() => setBuilderOpen(true)}
+        onHelp={() => onAction({ kind: 'help' })}
+        collapsedTiles={collapsed}
+        onToggleTile={(t) => dock.toggleCollapsed(t)}
+      />
       <Header
         sessionId={sessionId}
         model={health?.model}

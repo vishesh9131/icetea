@@ -32,6 +32,7 @@ from datetime import datetime, timezone
 from typing import Any, AsyncIterator
 
 from ..llm import LLMClient, LLMError, assemble_messages, get_llm_client
+from ._streaming import stream_pieces
 from ..safety import MODEL_INJECTION_GUARD
 from ..market_data import get_quote
 
@@ -609,11 +610,29 @@ class RiskAssessmentAgent:
             history=hist,
             user=_build_narrative_user_msg(query, structured),
         )
+        had_content = False
         try:
-            async for piece in client.stream_text(messages, temperature=0.2, max_tokens=320):
+            # bumped from 320 -> 700 so thinking-capable models still have a
+            # token budget left for the actual answer after the CoT pass
+            async for channel, piece in stream_pieces(
+                client, messages, temperature=0.2, max_tokens=700
+            ):
+                if channel == "think":
+                    yield {"type": "thinking", "delta": piece}
+                    continue
+                had_content = True
                 yield {"type": "data", "delta": piece}
         except LLMError as exc:
             logger.warning("Risk Assessment LLM narrative failed: %s", exc)
+            intro = _deterministic_intro(structured)
+            for chunk in _split_for_stream(intro):
+                yield {"type": "data", "delta": chunk}
+            had_content = True
+
+        if not had_content:
+            # The model spent its entire budget thinking and never emitted an
+            # answer. Fall back to the deterministic narrative so the user is
+            # not left with a thinking-only bubble.
             intro = _deterministic_intro(structured)
             for chunk in _split_for_stream(intro):
                 yield {"type": "data", "delta": chunk}

@@ -38,6 +38,10 @@ export type ChatRequest = {
 
 export type SseEvent =
   | { kind: 'token'; delta: string }
+  // chain-of-thought stream from thinking-capable models. Same shape as
+  // `token` but carries reasoning text we render in a collapsible block
+  // above the answer instead of inside it.
+  | { kind: 'thinking'; delta: string }
   | { kind: 'structured'; payload: Record<string, unknown> }
   | { kind: 'meta'; payload: Record<string, unknown> }
   | { kind: 'error'; payload: Record<string, unknown> }
@@ -61,6 +65,14 @@ export type ChatMessage = {
   // most recent collaborative round/agent surfaced in the bubble while we wait
   // for token output. Cleared on the first real token from the LLM.
   progress?: { stage: string; round?: number; agent?: string } | null
+  // model's chain-of-thought transcript when thinking is enabled. Lives in
+  // its own field so the ChatPanel can render a collapsible "Thinking..."
+  // block above the answer body.
+  thinking?: string
+  // whether the user has expanded the thinking block. We auto-open while
+  // streaming so the operator can watch the CoT, then collapse on first
+  // `content` token so the answer is the main thing.
+  thinkingOpen?: boolean
 }
 
 export type TraceEntry = {

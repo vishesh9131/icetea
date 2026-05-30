@@ -1,4 +1,4 @@
-# Python
+# --- Python -----------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *.pyo
@@ -14,32 +14,40 @@ htmlcov/
 .coverage
 *.cover
 
-# Environment
+# --- Node / frontend --------------------------------------------------------
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# --- Environment ------------------------------------------------------------
 .env
 .env.*
 !.env.example
 
-# Distribution
-dist/
-build/
-
-# IDE
+# --- IDE --------------------------------------------------------------------
 .vscode/
 .idea/
+.aware/
 *.swp
 *.swo
 
-# OS
+# --- OS ---------------------------------------------------------------------
 .DS_Store
 Thumbs.db
 
-# Misc
+# --- Misc -------------------------------------------------------------------
 *.log
+*.tar.gz
 tmp/
+Logs/
 openai.api
 
 # Local benchmarks (clones, venvs, logs, generated reports). README images
-# live under assets/benchmarks/ — run quality_eval / rejudge then copy, or use
-# the built-in copy step in those scripts.
+# live under assets/benchmarks/ — keep those, ignore the raw runs.
 local_benchmarks/
 local_benchmarks.tar.gz
+
+# Harness reports (.json / .md run dumps) — regenerate by running the harness.
+backend/Logs/

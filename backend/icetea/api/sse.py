@@ -38,6 +38,11 @@ def event_to_sse(event: dict[str, Any]) -> str:
         # narrative streaming — keep payload minimal so the browser can
         # concatenate `delta` cheaply
         return _encode("token", {"delta": event.get("delta", "")}, indent=None)
+    if etype == "thinking":
+        # chain-of-thought stream from thinking-capable models. Same shape
+        # as `data` but on its own SSE event so the UI can park it in a
+        # collapsible panel instead of the main answer body.
+        return _encode("thinking", {"delta": event.get("delta", "")}, indent=None)
     if etype == "structured":
         return _encode("structured", event.get("payload", {}), indent=2)
     if etype == "meta":

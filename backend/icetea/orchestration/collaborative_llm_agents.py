@@ -266,7 +266,13 @@ async def stream_chair_answer(
     momentum_analyst: dict[str, Any],
     temperature: float = 0.55,
     max_tokens: int = 1100,
-) -> AsyncIterator[str]:
+) -> AsyncIterator[tuple[str, str]]:
+    """Yield (channel, piece) tuples - channel is 'think' or 'content'.
+
+    Was AsyncIterator[str] previously; the supervisor call site was updated
+    in lockstep to branch on channel and emit a separate `thinking` SSE
+    event for the reasoning track.
+    """
     pack = {
         "user_question": query,
         "portfolio_analyst": _compact_agent(portfolio_analyst, answer_max_chars=380),
@@ -279,12 +285,21 @@ async def stream_chair_answer(
         user=_json_for_llm(pack),
     )
     try:
-        async for piece in llm.stream_text(
-            messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        ):
-            yield piece
+        tagged = getattr(llm, "stream_text_tagged", None)
+        if tagged is not None:
+            async for channel, piece in tagged(
+                messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            ):
+                yield channel, piece
+        else:
+            async for piece in llm.stream_text(
+                messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            ):
+                yield "content", piece
     except LLMError:
         raise
     except Exception as exc:
@@ -387,7 +402,7 @@ async def run_discussion_turn(
     return await _infer_agent(llm, system=system, user_blob=blob, temperature=temperature)
 
 
-async def stream_chair_from_transcript(
+async def stream_chair_from_transcript(  # noqa: D401 -- yields (channel, piece)
     llm: LLMClient,
     *,
     query: str,
@@ -395,7 +410,7 @@ async def stream_chair_from_transcript(
     shared_facts: dict[str, Any],
     temperature: float = 0.52,
     max_tokens: int = 1000,
-) -> AsyncIterator[str]:
+) -> AsyncIterator[tuple[str, str]]:
     pack = {
         "user_question": query,
         "agent_thread": _trim_transcript_for_chair(transcript, text_max=520),
@@ -406,12 +421,21 @@ async def stream_chair_from_transcript(
         user=_json_for_llm(pack),
     )
     try:
-        async for piece in llm.stream_text(
-            messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        ):
-            yield piece
+        tagged = getattr(llm, "stream_text_tagged", None)
+        if tagged is not None:
+            async for channel, piece in tagged(
+                messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            ):
+                yield channel, piece
+        else:
+            async for piece in llm.stream_text(
+                messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            ):
+                yield "content", piece
     except LLMError:
         raise
     except Exception as exc:

@@ -33,6 +33,7 @@ from typing import Any, AsyncIterator
 
 from ..config import get_settings
 from ..llm import LLMError, assemble_messages
+from ._streaming import stream_pieces
 
 # NB: imports for mcp_servers.registry / orchestration.toolkits.web_tools are
 # deferred inside the helpers below. Pulling them at module load triggers a
@@ -286,16 +287,33 @@ class GenericCustomAgent:
             yield {"type": "data", "delta": fallback}
             narrative_chunks.append(fallback)
         else:
+            had_content = False
             try:
-                async for piece in client.stream_text(
+                async for channel, piece in stream_pieces(
+                    client,
                     messages,
                     temperature=d.temperature,
                     max_tokens=d.max_tokens,
                 ):
+                    if channel == "think":
+                        yield {"type": "thinking", "delta": piece}
+                        continue
+                    had_content = True
                     narrative_chunks.append(piece)
                     yield {"type": "data", "delta": piece}
             except LLMError as exc:
                 msg = f"\n\n[{d.label} - LLM error: {exc}]"
+                narrative_chunks.append(msg)
+                yield {"type": "data", "delta": msg}
+                had_content = True
+            if not had_content:
+                # CoT consumed the budget on a thinking model; emit a
+                # short note so the user is not stuck with a blank bubble
+                msg = (
+                    f"\n\n[{d.label} - model spent all tokens on chain-of-thought; "
+                    "raise max_tokens in the agent definition to leave room "
+                    "for the answer.]"
+                )
                 narrative_chunks.append(msg)
                 yield {"type": "data", "delta": msg}
 

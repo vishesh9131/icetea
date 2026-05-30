@@ -65,6 +65,12 @@ class FakeCollabLLM:
         yield "Chair merges the panel — "
         yield "risk wants caution, momentum wants patience.\n\n"
 
+    async def stream_text_tagged(self, messages, **kwargs):  # noqa: ANN001
+        # supervisor / collab_llm now consume (channel, piece) tuples;
+        # mirror real client behaviour for the test fake too.
+        async for piece in self.stream_text(messages, **kwargs):
+            yield "content", piece
+
 
 def _collect_supervisor(async_gen):
     out = []

@@ -113,6 +113,8 @@ function parseFrame(frame: string): SseEvent | null {
   switch (eventName) {
     case 'token':
       return { kind: 'token', delta: typeof payload?.delta === 'string' ? payload.delta : '' }
+    case 'thinking':
+      return { kind: 'thinking', delta: typeof payload?.delta === 'string' ? payload.delta : '' }
     case 'structured':
       return { kind: 'structured', payload }
     case 'meta':
@@ -160,6 +162,51 @@ export async function fetchMeta(): Promise<ServiceMeta | null> {
     return (await r.json()) as ServiceMeta
   } catch {
     return null
+  }
+}
+
+// ---- LLM provider switch (used by onboarding + activity bar) -------------
+
+export type LlmProviderId = 'vllm' | 'openai' | 'claude'
+
+export type ProviderInfo = {
+  id: LlmProviderId
+  label: string
+  model: string
+  base_url: string
+  configured: boolean
+  note: string
+}
+
+export type ProviderList = {
+  active: LlmProviderId
+  providers: ProviderInfo[]
+}
+
+export async function fetchProviders(): Promise<ProviderList | null> {
+  try {
+    const r = await fetch(`${backendBase()}/v1/runtime/llm-providers`)
+    if (!r.ok) return null
+    return (await r.json()) as ProviderList
+  } catch {
+    return null
+  }
+}
+
+export async function setLlmProvider(
+  provider: LlmProviderId,
+): Promise<{ ok: boolean; provider?: LlmProviderId; model?: string; error?: string }> {
+  try {
+    const r = await fetch(`${backendBase()}/v1/runtime/llm-provider`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider }),
+    })
+    const data = await r.json().catch(() => ({}))
+    if (!r.ok) return { ok: false, error: data?.detail || `HTTP ${r.status}` }
+    return { ok: true, provider: data.provider, model: data.model }
+  } catch (e: unknown) {
+    return { ok: false, error: (e as Error)?.message || 'network error' }
   }
 }
 

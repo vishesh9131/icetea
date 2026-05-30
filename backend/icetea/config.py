@@ -5,13 +5,15 @@ One source of truth for env-driven config. Read once, share everywhere.
 We use pydantic-settings so that the same object validates env vars in prod
 and accepts overrides in tests via constructor kwargs.
 
-Two LLM providers are supported and they are swapped purely via env:
+Three LLM providers are supported and they are swapped purely via env
+(or at runtime via POST /v1/runtime/llm-provider):
 
     LLM_PROVIDER=openai      -> hits api.openai.com
     LLM_PROVIDER=vllm        -> hits a self-hosted VLLM endpoint
+    LLM_PROVIDER=claude      -> hits Anthropic via their OpenAI-compat API
 
-VLLM exposes the OpenAI Chat Completions wire format, so we reuse the
-official `openai` SDK and just override `base_url` + the model name. No
+All three speak the OpenAI Chat Completions wire format, so we reuse the
+official `openai` SDK and just swap `base_url` + the model name. No
 second client library to maintain.
 """
 from __future__ import annotations
@@ -24,7 +26,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-LLMProvider = Literal["openai", "vllm"]
+LLMProvider = Literal["openai", "vllm", "claude"]
 
 # Resolve `.env` next to this package (`backend/.env`), not from OS cwd.
 # Otherwise `uvicorn` started from another directory never sees your key, and
@@ -69,6 +71,14 @@ class Settings(BaseSettings):
     # still wants something non-empty. Keep a placeholder if unset.
     vllm_api_key: str = "EMPTY"
 
+    # --- Anthropic Claude (OpenAI-compatible endpoint) ---
+    # Anthropic ships an OpenAI Chat-Completions-compatible shim at this
+    # base URL so we can keep using the openai SDK. Auth is the standard
+    # ANTHROPIC_API_KEY passed as a bearer token.
+    anthropic_api_key: str | None = None
+    anthropic_base_url: str = "https://api.anthropic.com/v1/"
+    anthropic_model: str = "claude-3-5-sonnet-20241022"
+
     # --- Multi-agent (Assignment 2): collaborative SSE path ---
     multiagent_rounds: int = Field(default=3, ge=1, le=5, validation_alias="MULTIAGENT_ROUNDS")
     # When true, POST body can omit collaborative=true and still run the supervisor (demo flag).
@@ -99,7 +109,11 @@ class Settings(BaseSettings):
 
     @property
     def active_model(self) -> str:
-        return self.vllm_model if self.llm_provider == "vllm" else self.openai_model
+        if self.llm_provider == "vllm":
+            return self.vllm_model
+        if self.llm_provider == "claude":
+            return self.anthropic_model
+        return self.openai_model
 
 
 @lru_cache(maxsize=1)
@@ -110,3 +124,16 @@ def get_settings() -> Settings:
 def reset_settings_cache() -> None:
     # tests want a fresh Settings after monkeypatching env
     get_settings.cache_clear()
+
+
+# Runtime provider override. Lets the UI flip the active provider via
+# POST /v1/runtime/llm-provider without rebooting uvicorn. Setting this
+# does NOT touch the env-derived Settings (so a process restart still
+# returns to the env-declared default); it only patches the in-memory
+# copy returned by `get_settings()` and resets the LLM client singleton.
+def set_runtime_provider(provider: LLMProvider) -> Settings:
+    s = get_settings()
+    # mutate the cached instance in place so every downstream importer
+    # picks up the new provider without reloading
+    s.llm_provider = provider  # type: ignore[assignment]
+    return s

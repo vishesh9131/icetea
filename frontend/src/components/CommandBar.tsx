@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { PromptPalette } from './PromptPalette'
 
 export type CommandAction =
-  | { kind: 'send'; text: string }
+  | { kind: 'send'; text: string; agent_override?: string }
   | { kind: 'cancel' }
   | { kind: 'clear' }
   | { kind: 'toggle-collab' }
@@ -13,6 +14,10 @@ type Props = {
   onAction: (a: CommandAction) => void
   onOpenBuilder?: () => void
 }
+
+// Custom-event name the ActivityBar (or anyone else) can dispatch to
+// pop the prompt palette open without a direct prop wire.
+export const OPEN_PALETTE_EVENT = 'icetea:open-palette'
 
 // Each slot has an F-key (great on Windows/Linux + Macs with
 // "Use F1, F2 as standard function keys" enabled) AND a Control+digit
@@ -43,7 +48,15 @@ const CTRL_KEY_MAP: Record<string, () => CommandAction> = Object.fromEntries(
 
 export function CommandBar({ busy, collaborative, onAction, onOpenBuilder }: Props) {
   const [text, setText] = useState('')
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // external opener (ActivityBar -> palette) via custom event
+  useEffect(() => {
+    const open = () => setPaletteOpen(true)
+    window.addEventListener(OPEN_PALETTE_EVENT, open)
+    return () => window.removeEventListener(OPEN_PALETTE_EVENT, open)
+  }, [])
 
   // global F-keys + ENTER while focused elsewhere -> still send.
   useEffect(() => {
@@ -51,6 +64,16 @@ export function CommandBar({ busy, collaborative, onAction, onOpenBuilder }: Pro
       const target = e.target as HTMLElement | null
       const isInput =
         target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')
+
+      // Ctrl/Cmd+P -> open the prompt palette (avoids Mac browser print
+      // which is Cmd+P; on linux/win Ctrl+P also normally prints, we
+      // claim it inside the app since we have no print surface)
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault()
+        setPaletteOpen((v) => !v)
+        return
+      }
+
       if (FKEY_MAP[e.key]) {
         e.preventDefault()
         const a = FKEY_MAP[e.key]()
@@ -70,6 +93,9 @@ export function CommandBar({ busy, collaborative, onAction, onOpenBuilder }: Pro
         return
       }
       if (e.key === 'Escape') {
+        // dont leak escape to the cancel-stream path if the palette is
+        // the thing the operator actually wants to dismiss
+        if (paletteOpen) return
         e.preventDefault()
         onAction({ kind: 'cancel' })
         return
@@ -81,7 +107,7 @@ export function CommandBar({ busy, collaborative, onAction, onOpenBuilder }: Pro
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onAction])
+  }, [onAction, paletteOpen])
 
   const submit = () => {
     const t = text.trim()
@@ -96,7 +122,7 @@ export function CommandBar({ busy, collaborative, onAction, onOpenBuilder }: Pro
       <input
         ref={inputRef}
         className="input"
-        placeholder='Enter query  ·  e.g. "how is my portfolio?"  ·  press / to focus  ·  ESC to cancel'
+        placeholder='Enter query  ·  e.g. "how is my portfolio?"  ·  / focus  ·  ^P templates  ·  ESC cancel'
         value={text}
         autoFocus
         onChange={(e) => setText(e.target.value)}
@@ -107,25 +133,25 @@ export function CommandBar({ busy, collaborative, onAction, onOpenBuilder }: Pro
           }
         }}
       />
+      <span
+        className="chip chip-tpls"
+        onClick={() => setPaletteOpen((v) => !v)}
+        style={{ cursor: 'pointer' }}
+        title="Ctrl+P / Cmd+P  ·  PROMPT TEMPLATES (F1-F7 still work as quick-pick shortcuts)"
+      >
+        <span className="fg-amber-bright">^P</span> TPLS
+      </span>
       <div className="actions">
-        {SLOTS.map((s) => (
-          <span
-            key={s.fkey}
-            className="chip"
-            title={`${s.fkey}  or  Ctrl+${s.ctrlKey}  ·  ${s.label}`}
-            onClick={() => {
-              const a = s.action()
-              if (a.kind === 'send') setText(a.text)
-              onAction(a)
-              inputRef.current?.focus()
-            }}
-            style={{ cursor: 'pointer' }}
-          >
-            <span className="fg-amber-bright">{s.fkey}</span>
-            <span className="key-alt">·^{s.ctrlKey}</span>&nbsp;{s.label}
-          </span>
-        ))}
-        <span className={`chip ${collaborative ? 'on' : ''}`} onClick={() => onAction({ kind: 'toggle-collab' })} style={{ cursor: 'pointer' }} title="F10 / Ctrl+0  ·  COLLABORATIVE PIPELINE">
+        {/* The F1-F10 prompt-template chips used to live here. We removed them
+            once the TPLS palette + the left activity bar covered the same
+            ground - the keyboard shortcuts themselves (F1-F10, Ctrl+1-0) still
+            fire via the global key handler above. */}
+        <span
+          className={`chip chip-collab ${collaborative ? 'on' : ''}`}
+          onClick={() => onAction({ kind: 'toggle-collab' })}
+          style={{ cursor: 'pointer' }}
+          title="F10 / Ctrl+0  ·  COLLABORATIVE PIPELINE"
+        >
           COLLAB {collaborative ? 'ON' : 'OFF'}
         </span>
         {onOpenBuilder && (
@@ -144,6 +170,20 @@ export function CommandBar({ busy, collaborative, onAction, onOpenBuilder }: Pro
           <button className="btn" onClick={submit} disabled={!text.trim()}>SEND</button>
         )}
       </div>
+
+      <PromptPalette
+        open={paletteOpen}
+        onClose={() => { setPaletteOpen(false); inputRef.current?.focus() }}
+        onPick={(t, sendNow) => {
+          if (sendNow) {
+            onAction({ kind: 'send', text: t.prompt, agent_override: t.agent_override })
+            setText('')
+          } else {
+            setText(t.prompt)
+            inputRef.current?.focus()
+          }
+        }}
+      />
     </div>
   )
 }

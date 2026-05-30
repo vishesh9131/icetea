@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react'
 import type { Profile } from '../profiles'
+import { fetchProviders, type LlmProviderId, type ProviderInfo } from '../sseClient'
 import { THUMBS } from './CardThumbs'
+import { AsciiBackdrop } from './AsciiBackdrop'
+// shipped as a static text asset so we don't have to inline 300 columns of
+// ascii into a .tsx string literal. Vite's `?raw` loader returns the file
+// contents verbatim at build time.
+import asciiTitle from './icetea-title.txt?raw'
 
 export type OnboardingResult = {
   // Operator's display name. Becomes the chosen profile's `name` field on
@@ -10,6 +16,9 @@ export type OnboardingResult = {
   // Which preset bucket they picked. "empty" means start with no positions
   // - the operator will add them in the PORT panel themselves.
   profileId: string
+  // Which LLM the pipeline should call into. The choice is POSTed to the
+  // backend so every subsequent /v1/chat hits the right provider.
+  llmProvider: LlmProviderId
 }
 
 type Props = {
@@ -19,13 +28,36 @@ type Props = {
   onComplete: (result: OnboardingResult) => void
 }
 
-type Stage = 'splash' | 'name' | 'portfolio' | 'tour'
+type Stage = 'splash' | 'name' | 'provider' | 'portfolio' | 'tour'
+
+const STAGE_TOTAL = 4 // name, provider, portfolio, tour
+
+const DEFAULT_PROVIDER: LlmProviderId = 'vllm'
 
 export function OnboardingFlow({ profiles, onComplete }: Props) {
   const [stage, setStage] = useState<Stage>('splash')
   const [name, setName] = useState('')
   const [profileId, setProfileId] = useState<string>('')
+  const [llmProvider, setLlmProvider] = useState<LlmProviderId>(DEFAULT_PROVIDER)
+  const [providers, setProviders] = useState<ProviderInfo[] | null>(null)
   const [tourIdx, setTourIdx] = useState(0)
+
+  // Load the provider list as soon as we mount so the picker has data
+  // ready by the time the operator reaches stage 2. If the backend is
+  // offline we fall back to a hard-coded shell so the UX still works.
+  useEffect(() => {
+    let stopped = false
+    fetchProviders().then((p) => {
+      if (stopped) return
+      if (p?.providers?.length) {
+        setProviders(p.providers)
+        setLlmProvider(p.active || DEFAULT_PROVIDER)
+      } else {
+        setProviders(FALLBACK_PROVIDERS)
+      }
+    })
+    return () => { stopped = true }
+  }, [])
 
   // ESC at any time skips the whole flow with sensible defaults.
   useEffect(() => {
@@ -35,12 +67,13 @@ export function OnboardingFlow({ profiles, onComplete }: Props) {
         onComplete({
           name: name.trim() || 'OPERATOR',
           profileId: profileId || (profiles[0]?.id ?? 'empty'),
+          llmProvider,
         })
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [name, profileId, profiles, onComplete])
+  }, [name, profileId, profiles, llmProvider, onComplete])
 
   // ---- stage 1: title splash ----------------------------------------
   if (stage === 'splash') {
@@ -51,8 +84,9 @@ export function OnboardingFlow({ profiles, onComplete }: Props) {
   if (stage === 'name') {
     return (
       <div className="onb-overlay">
+        <AsciiBackdrop crop="right" />
         <div className="onb-card onb-stage">
-          <StageHeader step={1} total={3} title="WHO ARE YOU" />
+          <StageHeader step={1} total={STAGE_TOTAL} title="WHO ARE YOU" />
           <p className="onb-prose">
             What should the terminal call you? Used only inside this browser —
             shown in the PROFILE panel + when agents address you by name.
@@ -61,7 +95,7 @@ export function OnboardingFlow({ profiles, onComplete }: Props) {
             className="onb-form"
             onSubmit={(e) => {
               e.preventDefault()
-              if (name.trim()) setStage('portfolio')
+              if (name.trim()) setStage('provider')
             }}
           >
             <input
@@ -86,12 +120,67 @@ export function OnboardingFlow({ profiles, onComplete }: Props) {
     )
   }
 
-  // ---- stage 3: portfolio bucket --------------------------------------
+  // ---- stage 3: LLM provider ------------------------------------------
+  if (stage === 'provider') {
+    const list = providers ?? FALLBACK_PROVIDERS
+    return (
+      <div className="onb-overlay">
+        <AsciiBackdrop crop="left" />
+        <div className="onb-card onb-stage onb-wide">
+          <StageHeader step={2} total={STAGE_TOTAL} title="PICK YOUR BRAIN" />
+          <p className="onb-prose">
+            Which LLM should drive the agent team? You can switch later from
+            the activity bar &rarr; VIEW menu — nothing locks you in. Providers
+            without a server-side key show up dim until you set them in
+            <code> backend/.env</code>.
+          </p>
+          <div className="onb-provider-grid">
+            {list.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={
+                  'onb-provider'
+                  + (llmProvider === p.id ? ' active' : '')
+                  + (!p.configured ? ' disabled' : '')
+                }
+                onClick={() => { if (p.configured) setLlmProvider(p.id) }}
+                disabled={!p.configured}
+                title={!p.configured ? `${p.label} - ${p.note}` : p.label}
+              >
+                <div className="onb-provider-head">
+                  <span className="onb-provider-radio" aria-hidden="true">
+                    {llmProvider === p.id ? '(*)' : '( )'}
+                  </span>
+                  <span className="onb-provider-id">{p.id.toUpperCase()}</span>
+                  {!p.configured && <span className="onb-provider-tag">NO KEY</span>}
+                </div>
+                <div className="onb-provider-label">{p.label}</div>
+                <div className="onb-provider-model">model: {p.model || '—'}</div>
+                <div className="onb-provider-note">{p.note}</div>
+              </button>
+            ))}
+          </div>
+          <div className="onb-row">
+            <button className="onb-btn" onClick={() => setStage('name')}>&larr; BACK</button>
+            <button
+              className="onb-btn primary"
+              onClick={() => setStage('portfolio')}
+            >NEXT &rarr;</button>
+          </div>
+          <div className="onb-hint">switchable any time · esc to skip</div>
+        </div>
+      </div>
+    )
+  }
+
+  // ---- stage 4: portfolio bucket --------------------------------------
   if (stage === 'portfolio') {
     return (
       <div className="onb-overlay">
+        <AsciiBackdrop crop="bottom-right" />
         <div className="onb-card onb-stage onb-wide">
-          <StageHeader step={2} total={3} title="YOUR BOOK" />
+          <StageHeader step={3} total={STAGE_TOTAL} title="YOUR BOOK" />
           <p className="onb-prose">
             Pick a starter book to demo the system, or start empty and enter
             your real positions in the PORT panel after launch. You can
@@ -125,7 +214,7 @@ export function OnboardingFlow({ profiles, onComplete }: Props) {
             })}
           </div>
           <div className="onb-row">
-            <button className="onb-btn" onClick={() => setStage('name')}>&larr; BACK</button>
+            <button className="onb-btn" onClick={() => setStage('provider')}>&larr; BACK</button>
             <button
               className="onb-btn primary"
               disabled={!profileId}
@@ -147,9 +236,10 @@ export function OnboardingFlow({ profiles, onComplete }: Props) {
       if (e.key === 'ArrowRight') { e.preventDefault(); if (!lastCard) setTourIdx(tourIdx + 1) }
       if (e.key === 'ArrowLeft')  { e.preventDefault(); if (tourIdx > 0) setTourIdx(tourIdx - 1) }
     }} tabIndex={-1}>
+      <AsciiBackdrop crop="top" />
       <div className="onb-card onb-stage onb-wide">
         <div className="onb-card-head-row">
-          <StageHeader step={3} total={3} title="WHAT IT CAN DO" />
+          <StageHeader step={4} total={STAGE_TOTAL} title="WHAT IT CAN DO" />
           <div className="onb-card-num">{(tourIdx + 1).toString().padStart(2, '0')} / {CAPABILITIES.length.toString().padStart(2, '0')}</div>
         </div>
         <div className="onb-thumb-wrap">
@@ -184,7 +274,7 @@ export function OnboardingFlow({ profiles, onComplete }: Props) {
             <button
               className="onb-btn primary"
               autoFocus
-              onClick={() => onComplete({ name: name.trim(), profileId })}
+              onClick={() => onComplete({ name: name.trim(), profileId, llmProvider })}
             >LAUNCH TERMINAL &rarr;</button>
           )}
         </div>
@@ -196,31 +286,46 @@ export function OnboardingFlow({ profiles, onComplete }: Props) {
 
 // ----- helpers --------------------------------------------------------
 
-// Title-only splash. Auto-advances after a few seconds so the operator
-// doesn't sit on a static screen, but they can also click anywhere to
-// skip straight to the name prompt.
-const SPLASH_HOLD_MS = 2400
-
+// Title splash. No auto-advance any more - the operator clicks GET STARTED
+// when they're ready. Enter key also fires it for keyboard-first users.
 function SplashStage({ onDone }: { onDone: () => void }) {
+  // belt-and-braces: if vite/HMR ever ships an empty raw import (it shouldnt,
+  // but we saw a grey-flash during fast refresh) fall back to a plain
+  // wordmark so the splash is never visually blank.
+  const art = (asciiTitle && asciiTitle.trim().length > 0)
+    ? asciiTitle
+    : 'I C E T E A'
+
   useEffect(() => {
-    const id = setTimeout(onDone, SPLASH_HOLD_MS)
-    return () => clearTimeout(id)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        onDone()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [onDone])
 
   return (
     <div className="onb-overlay">
       <div className="onb-splash">
         <div className="onb-title-block">
-          <div className="onb-title">ICETEA</div>
-          <div className="onb-title-rule" />
+          {/* the trimmed ascii is ~79 rows x 298 cols - CSS scales the
+              font down so it sits inside a compact block, with line-height
+              crunched so the vertical footprint stays reasonable */}
+          <pre className="onb-ascii-title" aria-label="ICETEA">{art}</pre>
           <div className="onb-tag">your own AI co-investor team, on your desk.</div>
-          <div className="onb-skip">click anywhere to continue · esc to skip</div>
+          <button
+            className="onb-btn primary onb-cta"
+            onClick={onDone}
+            type="button"
+            autoFocus
+          >
+            GET STARTED &rarr;
+          </button>
+          <div className="onb-skip">press enter · or hit escape to skip the whole flow</div>
         </div>
-        <button
-          className="onb-skip-target"
-          onClick={onDone}
-          aria-label="continue"
-        />
       </div>
     </div>
   )
@@ -251,6 +356,15 @@ type Capability = {
   bullets: string[]
   kbd: string
 }
+
+// Backend-offline fallback for the provider picker. Keeps the onboarding
+// usable when /v1/runtime/llm-providers cant be reached on first paint
+// (e.g. operator opens the UI before uvicorn finishes booting).
+const FALLBACK_PROVIDERS: ProviderInfo[] = [
+  { id: 'vllm',   label: 'vLLM (self-hosted)',  model: 'default',                       base_url: 'https://vllm.corerec.online/v1', configured: true,  note: 'free · runs on your tunnel' },
+  { id: 'openai', label: 'OpenAI',              model: 'gpt-4o-mini',                   base_url: 'https://api.openai.com/v1',      configured: false, note: 'needs OPENAI_API_KEY' },
+  { id: 'claude', label: 'Anthropic Claude',    model: 'claude-3-5-sonnet-20241022',    base_url: 'https://api.anthropic.com/v1/',  configured: false, note: 'needs ANTHROPIC_API_KEY' },
+]
 
 const CAPABILITIES: Capability[] = [
   {

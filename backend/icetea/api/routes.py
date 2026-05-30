@@ -8,8 +8,8 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..agents import custom as custom_agents
 from ..agents.registry import _KNOWN_NAMES, _REAL as REAL_AGENTS
-from ..config import get_settings
-from ..llm import LLMError, get_llm_client
+from ..config import get_settings, set_runtime_provider
+from ..llm import LLMError, get_llm_client, reset_llm_client
 from ..mcp_servers.registry import build_agent_visible_catalog
 from ..pipeline import process_query
 from .market_tape import get_tape
@@ -55,6 +55,81 @@ async def meta() -> JSONResponse:
             "multiagent_rounds": s.multiagent_rounds,
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# Runtime provider switch (used by the onboarding flow + activity bar)
+# ---------------------------------------------------------------------------
+
+# Reports the providers the operator can pick + whether each one has the
+# credentials it needs to actually fire. Lets the onboarding UI grey out
+# (or warn about) providers the server cant talk to yet.
+@router.get("/v1/runtime/llm-providers")
+async def list_providers() -> JSONResponse:
+    s = get_settings()
+    openai_ok = bool(s.openai_api_key)
+    claude_ok = bool(s.anthropic_api_key)
+    return JSONResponse({
+        "active": s.llm_provider,
+        "providers": [
+            {
+                "id": "vllm",
+                "label": "vLLM (self-hosted)",
+                "model": s.vllm_model,
+                "base_url": s.vllm_base_url,
+                # vllm typically doesnt validate keys, so the placeholder is
+                # always "configured enough" to attempt a call.
+                "configured": True,
+                "note": "free · runs on your tunnel",
+            },
+            {
+                "id": "openai",
+                "label": "OpenAI",
+                "model": s.openai_model,
+                "base_url": s.openai_base_url or "https://api.openai.com/v1",
+                "configured": openai_ok,
+                "note": "paid · OpenAI API" if openai_ok else "set OPENAI_API_KEY in backend/.env",
+            },
+            {
+                "id": "claude",
+                "label": "Anthropic Claude",
+                "model": s.anthropic_model,
+                "base_url": s.anthropic_base_url,
+                "configured": claude_ok,
+                "note": "paid · Anthropic API" if claude_ok else "set ANTHROPIC_API_KEY in backend/.env",
+            },
+        ],
+    })
+
+
+@router.post("/v1/runtime/llm-provider")
+async def switch_provider(payload: dict) -> JSONResponse:
+    """Flip the active LLM provider without restarting uvicorn.
+
+    Body: { "provider": "vllm" | "openai" | "claude" }
+    Returns the new active provider + model, or 4xx if the choice is invalid
+    or the credentials for the requested provider are missing.
+    """
+    provider = (payload or {}).get("provider")
+    if provider not in {"vllm", "openai", "claude"}:
+        raise HTTPException(status_code=400, detail=f"unknown provider: {provider!r}")
+
+    s = get_settings()
+    # Refuse to switch into a provider that has no credentials - the operator
+    # would just see a confusing 500 on the next chat turn.
+    if provider == "openai" and not s.openai_api_key:
+        raise HTTPException(status_code=400, detail="openai selected but OPENAI_API_KEY is not set on the server")
+    if provider == "claude" and not s.anthropic_api_key:
+        raise HTTPException(status_code=400, detail="claude selected but ANTHROPIC_API_KEY is not set on the server")
+
+    new_settings = set_runtime_provider(provider)
+    reset_llm_client()
+    logger.info("runtime llm provider switched -> %s (%s)", new_settings.llm_provider, new_settings.active_model)
+    return JSONResponse({
+        "ok": True,
+        "provider": new_settings.llm_provider,
+        "model": new_settings.active_model,
+    })
 
 
 @router.get("/v1/market/tape")

@@ -6,9 +6,12 @@ import type { ChatMessage } from '../types'
 type Props = {
   messages: ChatMessage[]
   streaming: boolean
+  // toggle the collapsed/expanded state of a message's thinking pane.
+  // App owns the messages array so the toggle lives in the parent.
+  onToggleThinking?: (id: string) => void
 }
 
-export function ChatPanel({ messages, streaming }: Props) {
+export function ChatPanel({ messages, streaming, onToggleThinking }: Props) {
   const logRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -44,13 +47,19 @@ export function ChatPanel({ messages, streaming }: Props) {
         </div>
       )}
       {messages.map((m) => (
-        <MessageRow key={m.id} m={m} />
+        <MessageRow key={m.id} m={m} onToggleThinking={onToggleThinking} />
       ))}
     </div>
   )
 }
 
-function MessageRow({ m }: { m: ChatMessage }) {
+function MessageRow({
+  m,
+  onToggleThinking,
+}: {
+  m: ChatMessage
+  onToggleThinking?: (id: string) => void
+}) {
   const [showJson, setShowJson] = useState(false)
   const klass = m.role === 'user' ? 'user' : m.role === 'error' ? 'err' : m.role === 'system' ? 'sys' : 'bot'
   const role  = m.role === 'user' ? 'YOU' : m.role === 'error' ? 'ERR' : m.role === 'system' ? 'SYS' : 'AGT'
@@ -67,6 +76,14 @@ function MessageRow({ m }: { m: ChatMessage }) {
           <span className="latency">{(m.latencyMs / 1000).toFixed(1)}s</span>
         )}
       </div>
+      {m.thinking && (
+        <ThinkingBlock
+          text={m.thinking}
+          open={m.thinkingOpen ?? false}
+          streaming={!!m.streaming && !m.text}
+          onToggle={() => onToggleThinking?.(m.id)}
+        />
+      )}
       <div className={`body${useMarkdown(m) ? ' body-md' : ''}`}>
         {useMarkdown(m)
           ? <MarkdownBody text={m.text} />
@@ -114,6 +131,85 @@ function MarkdownBody({ text }: { text: string }) {
     >
       {text}
     </ReactMarkdown>
+  )
+}
+
+// "Thinking..." strip - short fixed-height viewport into the model's
+// chain-of-thought. New tokens arrive at the bottom, the whole transcript
+// pushes upward like a teleprompter, and the top + bottom edges fade out
+// (CSS mask + perspective transform) so the visible band reads like a
+// slice of a horizontal cylinder rotating past you. The pre is auto-
+// scrolled to the tail on every token so the user always sees the newest
+// thought without having to chase it.
+function ThinkingBlock({
+  text,
+  open,
+  streaming,
+  onToggle,
+}: {
+  text: string
+  open: boolean
+  streaming: boolean
+  onToggle: () => void
+}) {
+  const chars = text.length
+  // very rough token estimate (~4 chars / token for English). Cheap to compute,
+  // good enough to give a sense of "how much CoT was produced".
+  const tokens = Math.max(1, Math.round(chars / 4))
+  const bodyRef = useRef<HTMLPreElement>(null)
+  useEffect(() => {
+    const el = bodyRef.current
+    if (!el || !open) return
+    // We drive position via translateY (not scrollTop) because the body
+    // already has a rotateX + translateZ on it for the cylinder feel, and
+    // mixing that with CSS scroll-behavior: smooth caused the browser to
+    // clamp scroll writes to ~0. Transform-based motion is also genuinely
+    // smooth: the CSS transition on .thinking-body interpolates between
+    // each translateY value automatically.
+    //
+    // The target keeps the active write line 3 lines BELOW the visible
+    // bottom (i.e. inside the bottom fade), so the operator reads settled
+    // text instead of chasing the cursor.
+    const lh = parseFloat(getComputedStyle(el).lineHeight) || 17
+    const trailingLines = 3
+    const offset = trailingLines * lh
+    const viewport = el.parentElement
+    const viewportH = viewport ? viewport.clientHeight : el.clientHeight
+    const contentH = el.scrollHeight
+    // We want the bottom edge of the viewport to align with the line that
+    // is `trailingLines` rows BEFORE the end of content. That keeps the
+    // active write line, plus a couple of buffer rows, hidden below the
+    // bottom fade. Math: shift up by overflow MINUS offset (not plus) -
+    // the offset literally keeps the tail underneath the viewport floor.
+    // Clamp to 0 so the first 3-4 lines just stream in without scrolling.
+    const shift = Math.max(0, contentH - viewportH - offset)
+    el.style.setProperty('--thinking-shift', `-${shift}px`)
+  }, [text, open])
+  return (
+    <div className={`thinking-block${open ? ' open' : ''}`}>
+      <button
+        type="button"
+        className="thinking-header"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
+        <span className="thinking-arrow">{open ? 'v' : '>'}</span>
+        <span className="thinking-label">
+          {streaming ? 'THINKING…' : 'THINKING'}
+        </span>
+        <span className="thinking-stats">
+          {`${tokens} tok / ${chars} chars`}
+        </span>
+      </button>
+      {open && (
+        <div className="thinking-viewport" aria-hidden={!streaming ? undefined : true}>
+          {/* no trailing caret - the active token line is kept hidden
+              below the bottom fade by the trailing-scroll offset, so a
+              cursor here would only add noise the user cannot see */}
+          <pre ref={bodyRef} className="thinking-body">{text}</pre>
+        </div>
+      )}
+    </div>
   )
 }
 

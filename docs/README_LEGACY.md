@@ -1,4 +1,4 @@
-# Valura AI - AI co-investor microservice
+# Icetea AI - AI co-investor microservice
 
 A FastAPI service that takes a user query, runs a synchronous safety guard,
 classifies the intent with one LLM call, routes to a specialist agent, and
@@ -97,7 +97,7 @@ Mapping every "must" from `ASSIGNMENT.md` to where it lives in this repo.
 | Session memory         | `src/session.py`                 | In-memory, capped, TTL-evicted. Behind a `SessionStore` interface so it's swappable.                                  |
 | Market data            | `src/market_data.py`             | `yfinance` wrapper with TTL cache and graceful degradation. Tests don't hit the network.                              |
 | Portfolio Health agent | `src/agents/portfolio_health.py` | Full implementation. Concentration, performance, benchmark, observations, BUILD-mode for empty portfolios.              |
-| Stub agents            | `src/agents/stubs.py`            | One per name in the taxonomy. Each emits a structured "not implemented" payload.                                        |
+| Stub agents            | `src/agents/stubs.py`            | One `StubAgent` per unimplemented name; `general_query` uses thread + optional LLM inside the same class.              |
 | Router                 | `src/agents/registry.py`         | Maps classifier output to either a real agent or a stub.                                                                |
 | Pipeline               | `src/pipeline.py`                | The orchestrator. Yields normalized event dicts.                                                                        |
 | HTTP / SSE             | `src/api/`                       | FastAPI app, single `POST /v1/chat` SSE endpoint, `GET /healthz`.                                                   |
@@ -109,8 +109,8 @@ Mapping every "must" from `ASSIGNMENT.md` to where it lives in this repo.
 **Requirements:** Python 3.11+. (Tested on 3.11 and 3.12.)
 
 ```bash
-git clone https://github.com/vishesh9131/valura-ai-ai-engineer-assignment-vishesh9131.git
-cd valura-ai-ai-engineer-assignment-vishesh9131
+git clone https://github.com/vishesh9131/icetea-ai-ai-engineer-assignment-vishesh9131.git
+cd icetea-ai-ai-engineer-assignment-vishesh9131
 
 python -m venv venv
 source venv/bin/activate
@@ -580,7 +580,7 @@ src/
     base.py                # Agent Protocol
     registry.py            # name -> agent
     portfolio_health.py    # FULL implementation
-    stubs.py               # not-implemented stubs for everything else
+    stubs.py               # stubs + general_query (thread-aware, still implemented:false)
   api/
     app.py                 # FastAPI app factory
     routes.py              # /healthz + /v1/chat (SSE)

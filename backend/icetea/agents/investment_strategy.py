@@ -13,6 +13,7 @@ import re
 from typing import Any, AsyncIterator
 
 from ..llm import LLMClient, LLMError, assemble_messages, get_llm_client
+from ._streaming import stream_pieces
 from ..safety import MODEL_INJECTION_GUARD
 from .strategy_feasibility import build_decision_support_audit
 
@@ -263,12 +264,26 @@ class InvestmentStrategyAgent:
                 yield {"type": "data", "delta": chunk}
         else:
             messages = assemble_messages(system=SYSTEM, history=hist, user=user_blob)
+            had_content = False
             try:
-                async for piece in client.stream_text(messages, temperature=0.28, max_tokens=650):
+                # bumped from 650 -> 1400 to leave room for the answer after
+                # CoT on thinking-capable models
+                async for channel, piece in stream_pieces(
+                    client, messages, temperature=0.28, max_tokens=1400
+                ):
+                    if channel == "think":
+                        yield {"type": "thinking", "delta": piece}
+                        continue
+                    had_content = True
                     narrative += piece
                     yield {"type": "data", "delta": piece}
             except LLMError as exc:
                 logger.warning("Investment strategy LLM stream failed: %s", exc)
+                narrative = _offline_narrative(bundle)
+                for chunk in _split_stream(narrative):
+                    yield {"type": "data", "delta": chunk}
+                had_content = True
+            if not had_content:
                 narrative = _offline_narrative(bundle)
                 for chunk in _split_stream(narrative):
                     yield {"type": "data", "delta": chunk}

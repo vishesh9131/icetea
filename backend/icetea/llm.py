@@ -15,6 +15,7 @@ tests can hand in a fake without dragging in the real SDK.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any, AsyncIterator, Iterable, Protocol, runtime_checkable
@@ -66,17 +67,38 @@ class LLMClient(Protocol):
     ) -> AsyncIterator[str]:
         ...
 
+    # Optional. Implementations that support thinking-capable models can
+    # provide this to expose chain-of-thought on a separate channel. The
+    # base Protocol declares it but callers must use hasattr() to detect
+    # support, since fakes in tests are free to omit it.
+    async def stream_text_tagged(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        temperature: float = 0.3,
+        max_tokens: int = 800,
+        enable_thinking: bool = True,
+    ) -> AsyncIterator[tuple[str, str]]:
+        ...
+
 
 # ---------------------------------------------------------------------------
 # OpenAI / VLLM concrete client
 # ---------------------------------------------------------------------------
 
 class OpenAICompatClient:
-    """Drives both real OpenAI and a VLLM endpoint that speaks the same wire format.
+    """Drives every supported provider through the same openai SDK.
+
+    All three providers speak OpenAI's Chat Completions wire format:
+      - openai  ->  api.openai.com (or whatever OPENAI_BASE_URL points at)
+      - vllm    ->  our self-hosted vllm tunnel
+      - claude  ->  api.anthropic.com/v1 (their OpenAI-compat shim)
 
     For VLLM we ask for `response_format={"type": "json_object"}` because most
     served models support that but not full JSON-schema. For OpenAI proper we
     try the schema-enforced path first and fall back if the model rejects it.
+    Anthropic's compat layer doesnt support response_format yet, so we drop
+    it for claude and parse the JSON ourselves.
     """
 
     def __init__(self, settings: Settings | None = None) -> None:
@@ -101,6 +123,18 @@ class OpenAICompatClient:
                 timeout=per_call_timeout,
                 max_retries=0,
             )
+        elif self.provider == "claude":
+            if not self._settings.anthropic_api_key:
+                raise LLMError(
+                    "ANTHROPIC_API_KEY missing. Set it, or switch LLM_PROVIDER to openai/vllm."
+                )
+            self.model = self._settings.anthropic_model
+            self._client = OpenAI(
+                api_key=self._settings.anthropic_api_key,
+                base_url=self._settings.anthropic_base_url,
+                timeout=per_call_timeout,
+                max_retries=0,
+            )
         else:
             if not self._settings.openai_api_key:
                 raise LLMError(
@@ -116,13 +150,15 @@ class OpenAICompatClient:
 
     # Some self-hosted vllm models are "thinking" models (Qwen3 / hybrid reasoning).
     # By default they emit everything into a separate `reasoning` field and leave
-    # `content` empty — which breaks JSON parsing and streaming downstream. We send
-    # a chat_template_kwargs flag so the server skips the thinking pass entirely,
-    # giving us a normal completion. Hosts that ignore this flag are unaffected.
-    def _vllm_extra_body(self) -> dict[str, Any] | None:
+    # `content` empty — which breaks JSON parsing and the simple stream callers
+    # that just want the answer text. Default here is enable_thinking=False so
+    # JSON paths (the classifier, structured payloads) stay clean. The streaming
+    # path uses an explicit override to turn thinking back on when the caller
+    # asks for it (see stream_text_tagged below).
+    def _vllm_extra_body(self, *, enable_thinking: bool = False) -> dict[str, Any] | None:
         if self.provider != "vllm":
             return None
-        return {"chat_template_kwargs": {"enable_thinking": False}}
+        return {"chat_template_kwargs": {"enable_thinking": enable_thinking}}
 
     # -- structured ---------------------------------------------------------
 
@@ -157,6 +193,11 @@ class OpenAICompatClient:
                     "strict": True,
                 },
             }
+        elif self.provider == "claude":
+            # Anthropic's OpenAI-compat layer rejects response_format entirely
+            # (as of late 2025). We rely on the system prompt + _safe_json_loads
+            # to strip code fences and parse the body.
+            pass
         else:
             # vllm + plain openai both accept this everywhere
             kwargs["response_format"] = {"type": "json_object"}
@@ -191,17 +232,34 @@ class OpenAICompatClient:
 
     # -- streaming ----------------------------------------------------------
 
-    async def stream_text(
+    async def stream_text_tagged(
         self,
         messages: list[dict[str, str]],
         *,
         temperature: float = 0.3,
         max_tokens: int = 800,
-    ) -> AsyncIterator[str]:
-        # The openai SDK stream is a sync iterator; we wrap it as async
-        # so the FastAPI handler can await without blocking the loop.
-        # It is fine to do this here because the SDK uses httpx under the
-        # hood, which releases the GIL on network reads.
+        enable_thinking: bool = True,
+    ) -> AsyncIterator[tuple[str, str]]:
+        """Stream the completion, yielding (channel, piece) tuples.
+
+        channel is one of:
+          - "think":   model's chain-of-thought (reasoning_content track)
+          - "content": the actual answer text (content track)
+
+        Why two tracks: thinking-capable models (Qwen3, DeepSeek-R1 family)
+        emit reasoning on a separate `reasoning_content` field while the
+        normal answer streams on `content`. Surfacing them separately lets
+        the UI render a collapsible "Thinking..." block on top of the answer
+        bubble instead of jamming the whole CoT into the chat body.
+
+        Backward-compat: plain `stream_text` below filters down to content
+        only and never asks the server to think, so existing callers see no
+        behaviour change.
+
+        Threading note: see the comment inside the loop for why each next()
+        call goes through asyncio.to_thread — short version, the sync openai
+        iterator would otherwise block the event loop and break SSE flushing.
+        """
         create_kwargs: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
@@ -209,7 +267,7 @@ class OpenAICompatClient:
             "max_tokens": max_tokens,
             "stream": True,
         }
-        extra_body = self._vllm_extra_body()
+        extra_body = self._vllm_extra_body(enable_thinking=enable_thinking)
         if extra_body:
             create_kwargs["extra_body"] = extra_body
         try:
@@ -217,22 +275,76 @@ class OpenAICompatClient:
         except Exception as exc:
             raise LLMError(str(exc)) from exc
 
-        for chunk in stream:
+        stream_iter = iter(stream)
+        sentinel: Any = object()
+
+        def _safe_next() -> Any:
+            try:
+                return next(stream_iter)
+            except StopIteration:
+                return sentinel
+            except Exception as exc:  # network/retry errors bubble up here
+                return exc
+
+        while True:
+            # Each next(stream) is a blocking httpx read. We push it onto a
+            # worker thread so the event loop stays free to flush SSE after
+            # every yield - otherwise the whole response arrives on the wire
+            # as a single burst.
+            chunk = await asyncio.to_thread(_safe_next)
+            if chunk is sentinel:
+                break
+            if isinstance(chunk, BaseException):
+                raise LLMError(str(chunk)) from chunk
             try:
                 delta = chunk.choices[0].delta
             except (IndexError, AttributeError):
                 continue
-            piece = getattr(delta, "content", None)
-            # Some thinking models put streamed tokens in `reasoning_content` /
-            # `reasoning` while `content` stays empty. We treat the reasoning
-            # stream as user-visible if no content track ever shows up.
-            if not piece:
-                piece = (
-                    getattr(delta, "reasoning_content", None)
-                    or getattr(delta, "reasoning", None)
-                )
-            if piece:
+
+            # A single chunk can carry pieces of both tracks at once (rare in
+            # practice but allowed by the SDK shape). Emit them in CoT-then-
+            # answer order so the consumer's thinking buffer is always at
+            # least as fresh as the content buffer.
+            thinking_piece = (
+                getattr(delta, "reasoning_content", None)
+                or getattr(delta, "reasoning", None)
+            )
+            content_piece = getattr(delta, "content", None)
+            if thinking_piece:
+                yield ("think", thinking_piece)
+            if content_piece:
+                yield ("content", content_piece)
+
+    async def stream_text(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        temperature: float = 0.3,
+        max_tokens: int = 800,
+    ) -> AsyncIterator[str]:
+        # Backward-compat shim. Old callers expect a stream of plain content
+        # strings (no thinking). We disable thinking on the server side and
+        # filter to the content channel here. New callers that want CoT
+        # should use stream_text_tagged directly.
+        any_yielded = False
+        last_thinking: str = ""
+        async for channel, piece in self.stream_text_tagged(
+            messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            enable_thinking=False,
+        ):
+            if channel == "content":
+                any_yielded = True
                 yield piece
+            elif channel == "think":
+                # If a model ignores our enable_thinking=False flag and
+                # still emits reasoning_content while leaving content empty,
+                # we fall back to treating the reasoning track as the answer
+                # so the user is not left with a blank bubble.
+                last_thinking += piece
+        if not any_yielded and last_thinking:
+            yield last_thinking
 
 
 def _safe_json_loads(text: str) -> dict[str, Any]:
