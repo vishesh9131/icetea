@@ -1,0 +1,1756 @@
+/* ---------------------------------------------------------------
+   ICETEA TERMINAL
+   Visual language is borrowed straight from a 4-pane Bloomberg
+   Terminal: monospace everywhere, no rounded corners, hard 1px
+   borders, no shadows, no gradients. Every transition is
+   instantaneous on purpose -- the operator is the focus, not the
+   chrome.
+
+   Themes are CSS-variable swaps applied via [data-theme="..."]
+   on <html>. The defaults below (amber on black) match the
+   classic Bloomberg console. See `useTheme` in App.tsx for the
+   list and persistence.
+   --------------------------------------------------------------- */
+
+:root,
+:root[data-theme="amber"] {
+  --bg:            #000000;
+  --bg-panel:      #050505;
+  --bg-elev:       #0a0a0a;
+  --bg-hover:      #141414;
+  --bg-selected:   #1a1305;
+  --primary:       #ffa500;
+  --primary-bright:#ffd000;
+  --primary-dim:   #a16800;
+  --primary-faint: #5c3b00;
+  --green:         #5bff5b;
+  --green-dim:     #2fa02f;
+  --red:           #ff4444;
+  --red-dim:       #a02020;
+  --cyan:          #5bd9ff;
+  --magenta:       #ff66cc;
+  --white:         #e0e0e0;
+  --grey:          #6b6b6b;
+  --grey-dim:      #3a3a3a;
+  --border:        #1f1500;
+  --border-strong: #5c3b00;
+  --scan-tint:     rgba(255, 165, 0, 0.012);
+
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', 'Menlo', 'Consolas', monospace;
+  --row: 22px;
+}
+
+/* Icetea brand theme: cool teal/cyan on near-black. Same density,
+   different mood -- think a chilled trading desk after market close. */
+:root[data-theme="teal"] {
+  --bg:            #00131a;
+  --bg-panel:      #001a22;
+  --bg-elev:       #002130;
+  --bg-hover:      #00283a;
+  --bg-selected:   #003448;
+  --primary:       #2ad5b5;
+  --primary-bright:#7ff5dd;
+  --primary-dim:   #168c75;
+  --primary-faint: #094a3e;
+  --green:         #6bff9e;
+  --green-dim:     #2fa05b;
+  --red:           #ff5a7a;
+  --red-dim:       #a02040;
+  --cyan:          #5bd9ff;
+  --magenta:       #ff8acb;
+  --white:         #d8f4ee;
+  --grey:          #5d8782;
+  --grey-dim:      #2a4a47;
+  --border:        #053229;
+  --border-strong: #0a5d4d;
+  --scan-tint:     rgba(42, 213, 181, 0.018);
+}
+
+/* Classic CRT terminal: phosphor green on pure black. */
+:root[data-theme="crt"] {
+  --bg:            #000000;
+  --bg-panel:      #020a02;
+  --bg-elev:       #051705;
+  --bg-hover:      #082508;
+  --bg-selected:   #103210;
+  --primary:       #33ff66;
+  --primary-bright:#aaffaa;
+  --primary-dim:   #1c8c33;
+  --primary-faint: #0b3b18;
+  --green:         #66ff99;
+  --green-dim:     #2fa055;
+  --red:           #ff5252;
+  --red-dim:       #a02828;
+  --cyan:          #8affcf;
+  --magenta:       #ff80c0;
+  --white:         #d8ffd8;
+  --grey:          #4a6a4a;
+  --grey-dim:      #1c2f1c;
+  --border:        #082e10;
+  --border-strong: #1f5c28;
+  --scan-tint:     rgba(51, 255, 102, 0.022);
+}
+
+/* Ice-blue: cold, washed-out daylight palette. */
+:root[data-theme="ice"] {
+  --bg:            #03101a;
+  --bg-panel:      #06192a;
+  --bg-elev:       #0b2438;
+  --bg-hover:      #102f44;
+  --bg-selected:   #163d57;
+  --primary:       #6dc1ff;
+  --primary-bright:#b8e2ff;
+  --primary-dim:   #3e7aa8;
+  --primary-faint: #1b3c5a;
+  --green:         #88ffd1;
+  --green-dim:     #399c7f;
+  --red:           #ff7088;
+  --red-dim:       #a0364a;
+  --cyan:          #5bd9ff;
+  --magenta:       #ee88c8;
+  --white:         #e5f1fa;
+  --grey:          #4f6f88;
+  --grey-dim:      #1f3245;
+  --border:        #0c233a;
+  --border-strong: #1d4974;
+  --scan-tint:     rgba(109, 193, 255, 0.016);
+}
+
+/* Paperwhite: high-contrast inverted theme (for sunny rooms / demos). */
+:root[data-theme="paper"] {
+  --bg:            #f4ecd8;
+  --bg-panel:      #ebe1c8;
+  --bg-elev:       #e2d6b8;
+  --bg-hover:      #d8caa5;
+  --bg-selected:   #c8b888;
+  --primary:       #2a2a2a;
+  --primary-bright:#000000;
+  --primary-dim:   #6b6b6b;
+  --primary-faint: #b8a880;
+  --green:         #1f7a3a;
+  --green-dim:     #114820;
+  --red:           #b8121f;
+  --red-dim:       #7a0a10;
+  --cyan:          #1d5d8a;
+  --magenta:       #8b1f6c;
+  --white:         #1a1a1a;
+  --grey:          #7a7060;
+  --grey-dim:      #c2b08c;
+  --border:        #c8b888;
+  --border-strong: #8a7a55;
+  --scan-tint:     rgba(0, 0, 0, 0.018);
+}
+
+/* Backwards-compat: existing rules use --amber*. Alias to --primary*. */
+:root {
+  --amber:         var(--primary);
+  --amber-bright:  var(--primary-bright);
+  --amber-dim:     var(--primary-dim);
+  --amber-faint:   var(--primary-faint);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  background: var(--bg);
+  color: var(--amber);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.35;
+  letter-spacing: 0;
+  overflow: hidden;
+}
+
+body {
+  /* Very faint scanline — the only "skin" we allow ourselves. Color is
+     theme-driven so the overlay tints the way the active palette does. */
+  background-image: repeating-linear-gradient(
+    0deg,
+    var(--scan-tint) 0px,
+    var(--scan-tint) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+button, input, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  outline: none;
+}
+
+button {
+  cursor: pointer;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--bg-panel);
+}
+button:hover { background: var(--bg-hover); color: var(--amber-bright); }
+button:active { background: var(--bg-selected); }
+button:disabled { color: var(--grey); border-color: var(--grey-dim); cursor: not-allowed; }
+
+input, select, textarea {
+  padding: 2px 6px;
+  background: var(--bg-panel);
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--amber);
+  background: var(--bg-elev);
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--amber-faint); }
+::-webkit-scrollbar-thumb:hover { background: var(--amber-dim); }
+
+/* ---------------------------------------------------------------
+   Layout grid: header / ticker / [chat | side] / command / status
+   --------------------------------------------------------------- */
+.terminal {
+  display: grid;
+  grid-template-rows: 28px 22px 1fr 26px 20px;
+  grid-template-columns: 1fr;
+  height: 100vh;
+  width: 100vw;
+}
+
+.terminal-body {
+  display: block;
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ---------------------------------------------------------------
+   Dock layout — wraps react-resizable-panels' PanelGroup output.
+   The handle/grip styling is brutalist on purpose: a 1px hairline
+   that fattens slightly when grabbed, no rounded corners.
+   --------------------------------------------------------------- */
+.dock { width: 100%; height: 100%; min-height: 0; }
+.dock-group { width: 100%; height: 100%; }
+.dock-tile {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.dock-subgroup {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+}
+.dock-tile-inner {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+.dock-tile-inner.drag-target {
+  outline: 2px dashed var(--primary);
+  outline-offset: -2px;
+  background: var(--bg-selected);
+}
+
+/* the resize handle itself */
+.dock-handle {
+  background: var(--border-strong);
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.05s linear;
+}
+.dock-handle.h { width: 1px; cursor: col-resize; }
+.dock-handle.v { height: 1px; cursor: row-resize; }
+.dock-handle:hover,
+.dock-handle[data-resize-handle-active] {
+  background: var(--primary);
+}
+.dock-handle.h:hover,
+.dock-handle.h[data-resize-handle-active] { width: 3px; }
+.dock-handle.v:hover,
+.dock-handle.v[data-resize-handle-active] { height: 3px; }
+
+/* an unobtrusive grip indicator that appears on hover */
+.dock-handle-grip {
+  position: absolute;
+  background: var(--primary-bright);
+  opacity: 0;
+  transition: opacity 0.08s linear;
+  pointer-events: none;
+}
+.dock-handle.h .dock-handle-grip {
+  width: 1px;
+  height: 18px;
+}
+.dock-handle.v .dock-handle-grip {
+  height: 1px;
+  width: 18px;
+}
+.dock-handle:hover .dock-handle-grip,
+.dock-handle[data-resize-handle-active] .dock-handle-grip {
+  opacity: 0.9;
+}
+
+/* ---------------------------------------------------------------
+   Per-tile header chrome (dock-aware overlay on .panel-header)
+   --------------------------------------------------------------- */
+.dock-header {
+  cursor: grab;
+  user-select: none;
+}
+.dock-header:active { cursor: grabbing; }
+
+.dock-header .dock-grip {
+  display: inline-block;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: -1px;
+  margin-right: 6px;
+  opacity: 0.55;
+}
+.dock-header .ph-title { font-weight: 700; }
+.dock-header .ph-hint {
+  margin-left: 6px;
+  font-weight: 500;
+  opacity: 0.65;
+}
+.dock-header .ph-spacer { flex: 1; }
+.dock-header .ph-stat {
+  font-weight: 500;
+  opacity: 0.85;
+  margin: 0 6px;
+}
+
+.dock-btn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--bg);
+  font: inherit;
+  font-weight: 700;
+  padding: 0 6px;
+  margin-left: 2px;
+  line-height: 1;
+  cursor: pointer;
+  height: 16px;
+}
+.dock-btn:hover { background: var(--bg); color: var(--primary-bright); }
+
+/* focused tile gets a thin 2-px primary outline along its inner edge */
+.panel-focused {
+  position: relative;
+}
+.panel-focused::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--primary-bright);
+  pointer-events: none;
+}
+
+/* collapsed tile: hide the body (PanelFrame already omits children,
+   but the chrome stays visible so the user can grab it back) */
+.panel-collapsed > :not(.panel-header) { display: none !important; }
+.panel-collapsed .panel-header { opacity: 0.85; }
+
+/* legacy .terminal-side grid is replaced by the dock; the class is
+   kept defined as an empty box so any stray references dont throw. */
+.terminal-side { display: contents; }
+
+/* ---------------------------------------------------------------
+   Panel chrome — a panel = title strip + scrollable body.
+   --------------------------------------------------------------- */
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border-top: 1px solid var(--border-strong);
+  background: var(--bg);
+}
+.panel:first-child { border-top: 0; }
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1px 8px;
+  background: var(--amber);
+  color: var(--bg);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  user-select: none;
+  height: 18px;
+  flex: 0 0 18px;
+}
+.panel-header .meta {
+  color: var(--bg);
+  opacity: 0.7;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+
+.panel-body {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 4px 8px;
+  background: var(--bg);
+}
+
+/* ---------------------------------------------------------------
+   Header bar (top of viewport)
+   --------------------------------------------------------------- */
+.header {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px;
+  background: var(--amber);
+  color: var(--bg);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-size: 11.5px;
+  gap: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.header .brand {
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  padding-right: 10px;
+  border-right: 2px solid var(--bg);
+  flex: 0 0 auto;
+}
+.header .meta {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.header .meta .key { opacity: 0.7; margin-right: 2px; }
+.header .meta .val { font-weight: 700; }
+@media (max-width: 1100px) {
+  .header { font-size: 10.5px; gap: 8px; letter-spacing: 0.1em; }
+  .header .brand { letter-spacing: 0.2em; }
+}
+
+/* ---------------------------------------------------------------
+   Ticker strip
+   --------------------------------------------------------------- */
+.ticker {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--bg);
+  border-bottom: 0;
+  overflow: hidden;
+  position: relative;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+.ticker-track {
+  display: flex;
+  gap: 32px;
+  white-space: nowrap;
+  padding-left: 100%;
+  animation: ticker-scroll 60s linear infinite;
+}
+.ticker-item { display: inline-flex; gap: 8px; }
+.ticker-item .sym { color: var(--amber-bright); font-weight: 700; }
+.ticker-item .up { color: var(--green); }
+.ticker-item .down { color: var(--red); }
+.ticker-item .flat { color: var(--white); }
+
+/* served from cache while backend refreshes - just dim slightly */
+.ticker.stale .ticker-track { opacity: 0.7; }
+/* backend unreachable - more visible cue */
+.ticker.offline .ticker-track { opacity: 0.45; filter: grayscale(0.6); }
+
+/* ---------------------------------------------------------------
+   News panel - dock tile that shows live yfinance stories.
+   --------------------------------------------------------------- */
+.news-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.news-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+.news-tabs { display: flex; gap: 4px; }
+.news-tab {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--amber-dim);
+  padding: 1px 8px;
+  font: inherit;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.news-tab:hover { color: var(--amber-bright); border-color: var(--amber-bright); }
+.news-tab.active {
+  background: var(--amber);
+  color: var(--bg);
+  border-color: var(--amber);
+}
+.news-meta {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  color: var(--grey);
+}
+.news-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+}
+.news-empty {
+  padding: 12px;
+  text-align: center;
+  color: var(--grey);
+  font-size: 11px;
+}
+.news-row {
+  display: block;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--amber);
+  text-decoration: none;
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+.news-row:hover { background: var(--bg-panel); }
+.news-row-meta {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 2px;
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.news-source { color: var(--cyan); font-weight: 700; }
+.news-tickers { color: var(--amber-bright); }
+.news-time { margin-left: auto; color: var(--grey); }
+.news-title {
+  color: var(--amber-bright);
+  font-weight: 600;
+}
+.news-row:hover .news-title { color: var(--white); }
+.news-summary {
+  margin-top: 2px;
+  color: var(--amber-dim);
+  font-size: 10.5px;
+}
+
+/* ---------------------------------------------------------------
+   Reader panel - shows full article body fetched server-side.
+   Body uses the same system-ui stack as the chat assistant
+   messages so long-form text is comfortable to read.
+   --------------------------------------------------------------- */
+.reader-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.reader-empty {
+  padding: 18px 16px;
+  color: var(--grey);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.reader-head {
+  padding: 6px 10px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.reader-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+.reader-source { color: var(--cyan); font-weight: 700; }
+.reader-tickers { color: var(--amber-bright); }
+.reader-time { margin-left: auto; color: var(--grey); }
+.reader-title {
+  color: var(--amber-bright);
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.3;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter",
+    "Helvetica Neue", Arial, sans-serif;
+}
+.reader-url {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 10.5px;
+}
+.reader-url a {
+  color: var(--cyan);
+  text-decoration: none;
+  font-weight: 700;
+}
+.reader-url a:hover { color: var(--white); text-decoration: underline; }
+.reader-url-text {
+  color: var(--grey);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.reader-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 10px 12px;
+  min-height: 0;
+}
+.reader-status {
+  color: var(--grey);
+  font-size: 11px;
+  padding: 8px 0;
+}
+.reader-status.reader-error {
+  color: var(--red);
+}
+.reader-text {
+  color: var(--amber);
+  font-size: 12.5px;
+  line-height: 1.55;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter",
+    "Helvetica Neue", Arial, sans-serif;
+}
+.reader-text p {
+  margin: 0 0 10px;
+}
+.reader-text p:first-child {
+  color: var(--amber-bright);
+}
+.reader-truncated {
+  margin-top: 8px;
+  color: var(--grey);
+  font-size: 10.5px;
+  font-style: italic;
+  border-top: 1px dashed var(--border);
+  padding-top: 8px;
+}
+
+/* ---------------------------------------------------------------
+   Modal overlay + Agent Builder
+   --------------------------------------------------------------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.74);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.modal {
+  background: var(--bg);
+  border: 1px solid var(--amber);
+  box-shadow: 0 0 0 1px var(--bg), 0 6px 32px rgba(0, 0, 0, 0.6);
+  width: 100%;
+  max-width: 1200px;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 12px;
+  background: var(--amber);
+  color: var(--bg);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.modal-sub {
+  font-weight: 400;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  opacity: 0.85;
+}
+.modal-close {
+  margin-left: auto;
+  background: transparent;
+  border: 0;
+  color: var(--bg);
+  font-size: 18px;
+  cursor: pointer;
+  width: 24px;
+  height: 22px;
+  line-height: 20px;
+  text-align: center;
+}
+.modal-close:hover { background: rgba(0, 0, 0, 0.2); }
+
+.builder-body {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.builder-left {
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 8px;
+}
+.builder-right {
+  overflow-y: auto;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.builder-section-title {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amber-bright);
+  margin: 8px 0 4px;
+  padding-bottom: 2px;
+  border-bottom: 1px dashed var(--border);
+}
+.builder-hint { color: var(--grey); font-weight: 400; }
+.builder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+.builder-empty { color: var(--grey); font-size: 10.5px; padding: 4px; }
+.builder-list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 11px;
+}
+.builder-list-row:hover { background: var(--bg-panel); border-color: var(--border); }
+.builder-list-row.active { background: var(--bg-panel); border-color: var(--amber); }
+.builder-list-row.builtin { cursor: default; opacity: 0.85; }
+.builder-list-id {
+  color: var(--amber-bright);
+  font-weight: 700;
+  font-size: 10.5px;
+}
+.builder-list-label { color: var(--amber); flex: 1; }
+.builder-list-impl {
+  font-size: 9.5px;
+  padding: 0 4px;
+  border: 1px solid var(--border-strong);
+}
+.builder-list-impl.on { color: var(--green); border-color: var(--green); }
+.builder-list-impl.off { color: var(--grey); border-color: var(--grey); }
+.builder-del {
+  background: transparent;
+  border: 0;
+  color: var(--red);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.builder-del:hover { color: var(--white); background: var(--red); }
+
+/* Form rows */
+.builder-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.builder-row-single { display: block; }
+.builder-right label {
+  display: block;
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--amber-dim);
+}
+.builder-right label > span:first-child { display: block; margin-bottom: 2px; }
+.builder-right input,
+.builder-right textarea {
+  width: 100%;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  color: var(--amber);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 4px 6px;
+  box-sizing: border-box;
+}
+.builder-right textarea {
+  resize: vertical;
+  line-height: 1.4;
+  min-height: 100px;
+}
+.builder-right input:focus,
+.builder-right textarea:focus {
+  outline: none;
+  border-color: var(--amber-bright);
+}
+
+/* Tools picker */
+.builder-tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  border: 1px solid var(--border);
+  padding: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.builder-tool-group-name {
+  font-size: 9.5px;
+  color: var(--cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 3px;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 2px;
+}
+.builder-tool {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 4px;
+  align-items: start;
+  padding: 2px 0;
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--amber);
+  cursor: pointer;
+}
+.builder-tool input { width: auto; margin: 0; }
+.builder-tool-label { font-weight: 600; color: var(--amber-bright); }
+.builder-tool-desc {
+  grid-column: 2;
+  color: var(--grey);
+  font-size: 10px;
+  margin-top: 1px;
+}
+
+/* Footer */
+.builder-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.builder-btn {
+  background: transparent;
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  padding: 4px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.builder-btn:hover:not(:disabled) {
+  background: var(--amber);
+  color: var(--bg);
+}
+.builder-btn.primary {
+  background: var(--amber);
+  color: var(--bg);
+  font-weight: 700;
+}
+.builder-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.builder-run {
+  display: flex;
+  gap: 6px;
+  flex: 1 1 280px;
+  margin-left: auto;
+}
+.builder-run-input {
+  flex: 1;
+  background: var(--bg-panel);
+  border: 1px solid var(--amber);
+  color: var(--amber-bright);
+  font-family: var(--font-mono);
+  padding: 4px 8px;
+  font-size: 11.5px;
+  box-sizing: border-box;
+}
+.builder-run-input:focus { outline: none; border-color: var(--amber-bright); }
+.builder-error {
+  border-left: 2px solid var(--red);
+  color: var(--red);
+  background: var(--bg-panel);
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.builder-toast {
+  border-left: 2px solid var(--green);
+  color: var(--green);
+  background: var(--bg-panel);
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* ---------------------------------------------------------------
+   Command bar
+   --------------------------------------------------------------- */
+.cmdbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 6px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+}
+.cmdbar .prompt {
+  color: var(--amber-bright);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.cmdbar .input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--white);
+  padding: 0;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+.cmdbar .input::placeholder { color: var(--grey); letter-spacing: 0.06em; }
+.cmdbar .actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.cmdbar .actions .chip {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  padding: 1px 6px;
+  border: 1px solid var(--border-strong);
+  color: var(--amber-dim);
+  text-transform: uppercase;
+  user-select: none;
+}
+.cmdbar .actions .chip.on {
+  color: var(--bg);
+  background: var(--amber);
+  border-color: var(--amber);
+}
+/* Mac-friendly Ctrl+digit alias rendered inline next to the F-key label */
+.cmdbar .actions .chip .key-alt {
+  color: var(--amber-dim);
+  opacity: 0.55;
+  font-size: 9px;
+  margin-left: 2px;
+  letter-spacing: 0.04em;
+}
+.cmdbar .actions .chip:hover {
+  border-color: var(--amber-bright);
+  color: var(--amber-bright);
+}
+.cmdbar .actions .btn {
+  padding: 1px 10px;
+  font-size: 11px;
+}
+
+/* ---------------------------------------------------------------
+   Status bar (bottom)
+   --------------------------------------------------------------- */
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 20px;
+  padding: 0 8px;
+  background: var(--bg-panel);
+  color: var(--amber-dim);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-top: 1px solid var(--border-strong);
+}
+.statusbar .pill {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  color: var(--amber);
+}
+.statusbar .pill .val { color: var(--amber-bright); font-weight: 700; }
+.statusbar .pill.ok .dot { background: var(--green); }
+.statusbar .pill.err .dot { background: var(--red); }
+.statusbar .pill.warn .dot { background: var(--amber-bright); }
+.statusbar .dot {
+  width: 6px; height: 6px; border-radius: 0;
+  display: inline-block;
+}
+.statusbar .spacer { flex: 1; }
+.statusbar .clock { color: var(--green); font-weight: 700; margin-left: 12px; }
+.statusbar .theme-select {
+  appearance: none;
+  background: var(--bg);
+  color: var(--primary-bright);
+  border: 1px solid var(--border-strong);
+  padding: 0 4px;
+  height: 14px;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-left: 4px;
+  cursor: pointer;
+}
+.statusbar .theme-select:focus { border-color: var(--primary); }
+
+/* ---------------------------------------------------------------
+   Chat panel
+   --------------------------------------------------------------- */
+.chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.chat-log {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 6px 10px 10px 10px;
+  background: var(--bg);
+}
+.chat-msg {
+  padding: 4px 0 8px 0;
+  border-bottom: 1px dotted var(--border);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.chat-msg:last-child { border-bottom: 0; }
+.chat-msg .meta-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding-bottom: 3px;
+}
+.chat-msg .meta-row .role { font-weight: 700; }
+.chat-msg .meta-row .ts   { color: var(--grey); }
+.chat-msg .meta-row .latency { color: var(--cyan); }
+.chat-msg .meta-row .agent-tag {
+  padding: 0 6px;
+  border: 1px solid var(--amber);
+  color: var(--amber-bright);
+}
+.chat-msg.user .meta-row .role { color: var(--white); }
+.chat-msg.user .body { color: var(--white); }
+.chat-msg.bot  .meta-row .role { color: var(--amber); }
+.chat-msg.bot  .body { color: var(--amber); }
+.chat-msg.sys  .meta-row .role { color: var(--cyan); }
+.chat-msg.sys  .body { color: var(--cyan); }
+.chat-msg.err  .meta-row .role { color: var(--red); }
+.chat-msg.err  .body { color: var(--red); }
+
+.chat-msg .body {
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+/* ---------------------------------------------------------------
+   Markdown body for assistant replies.
+   We keep the rest of the terminal in monospace, but the AI's actual
+   prose reads much better in a sans-serif "chat" font like ChatGPT
+   uses. Söhne is proprietary - the stack below resolves to the OS
+   system font on every platform, which is the closest free match.
+   --------------------------------------------------------------- */
+.chat-msg .body.body-md {
+  font-family:
+    -apple-system, BlinkMacSystemFont,
+    "Segoe UI", "Inter", "Helvetica Neue", Roboto,
+    Helvetica, Arial, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji";
+  font-size: 14px;
+  line-height: 1.48;
+  letter-spacing: 0.005em;
+  color: var(--amber);
+}
+/* paragraph spacing kept tight - the LLM tends to over-blank between
+   sentences which markdown renders as separate <p> blocks, so we
+   default the gap small enough that the chat stays compact. */
+.chat-msg .body.body-md p { margin: 0 0 0.4em 0; }
+.chat-msg .body.body-md > p:last-child { margin-bottom: 0; }
+.chat-msg .body.body-md h1,
+.chat-msg .body.body-md h2,
+.chat-msg .body.body-md h3,
+.chat-msg .body.body-md h4 {
+  margin: 0.55em 0 0.15em 0;
+  color: var(--amber-bright);
+  font-weight: 700;
+  line-height: 1.2;
+}
+.chat-msg .body.body-md > h1:first-child,
+.chat-msg .body.body-md > h2:first-child,
+.chat-msg .body.body-md > h3:first-child,
+.chat-msg .body.body-md > h4:first-child {
+  margin-top: 0;
+}
+.chat-msg .body.body-md h1 { font-size: 1.18em; }
+.chat-msg .body.body-md h2 { font-size: 1.08em; }
+.chat-msg .body.body-md h3 { font-size: 1.0em; text-transform: uppercase; letter-spacing: 0.04em; }
+.chat-msg .body.body-md h4 { font-size: 0.95em; }
+.chat-msg .body.body-md strong { color: var(--amber-bright); font-weight: 700; }
+.chat-msg .body.body-md em { color: var(--cyan); font-style: italic; }
+.chat-msg .body.body-md ul,
+.chat-msg .body.body-md ol {
+  margin: 0.15em 0 0.4em 0;
+  padding-left: 1.35em;
+}
+.chat-msg .body.body-md li { margin: 0.08em 0; }
+.chat-msg .body.body-md li::marker { color: var(--amber-dim); }
+/* "loose list" fix - when the LLM puts blank lines between bullets,
+   remark wraps each item's text in a <p>. Without these resets every
+   bullet gets a full paragraph's worth of bottom margin tacked on,
+   which is what was producing the giant gaps in the chat. */
+.chat-msg .body.body-md li > p { margin: 0; }
+.chat-msg .body.body-md li > p + p { margin-top: 0.25em; }
+.chat-msg .body.body-md li > ul,
+.chat-msg .body.body-md li > ol { margin: 0.1em 0 0.15em 0; }
+.chat-msg .body.body-md blockquote {
+  margin: 0.4em 0;
+  padding: 4px 10px;
+  border-left: 2px solid var(--amber);
+  background: var(--bg-panel);
+  color: var(--amber-dim);
+  font-style: italic;
+}
+.chat-msg .body.body-md hr {
+  border: none;
+  border-top: 1px dashed var(--border);
+  margin: 0.6em 0;
+}
+.chat-msg .body.body-md a {
+  color: var(--cyan);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.chat-msg .body.body-md a:hover { color: var(--amber-bright); }
+/* inline code and code blocks keep the monospace face for readability */
+.chat-msg .body.body-md code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  padding: 0 4px;
+  border-radius: 2px;
+  color: var(--amber-bright);
+}
+.chat-msg .body.body-md pre {
+  margin: 0.6em 0;
+  padding: 8px 10px;
+  background: var(--bg-panel);
+  border-left: 2px solid var(--amber);
+  overflow-x: auto;
+}
+.chat-msg .body.body-md pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--amber);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.chat-msg .body.body-md table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 12px;
+}
+.chat-msg .body.body-md th,
+.chat-msg .body.body-md td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  text-align: left;
+}
+.chat-msg .body.body-md th {
+  background: var(--bg-panel);
+  color: var(--amber-bright);
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+}
+
+.chat-msg .structured-toggle {
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: var(--amber-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  user-select: none;
+}
+.chat-msg .structured-toggle:hover { color: var(--amber-bright); }
+
+.chat-msg pre.structured {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--amber);
+  background: var(--bg-panel);
+  color: var(--white);
+  font-size: 11.5px;
+  overflow: auto;
+  max-height: 280px;
+}
+
+/* Cursor blink at end of streaming token line */
+.cursor {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  background: var(--amber-bright);
+  vertical-align: -2px;
+  margin-left: 2px;
+  animation: blink 1.05s steps(2) infinite;
+}
+@keyframes blink {
+  to { background: transparent; }
+}
+
+/* Shown inside a streaming bot bubble while the collaborative supervisor
+   is still walking through its agents and no tokens have streamed yet. */
+.progress-strip {
+  color: var(--amber-dim);
+  font-style: italic;
+  opacity: 0.78;
+  letter-spacing: 0.6px;
+  margin-bottom: 4px;
+}
+
+/* ---------------------------------------------------------------
+   Portfolio panel
+   --------------------------------------------------------------- */
+.portfolio {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.portfolio-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  align-items: center;
+}
+.portfolio-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--amber-dim);
+}
+.portfolio-controls select,
+.portfolio-controls input {
+  height: 18px;
+  font-size: 11px;
+  padding: 0 4px;
+}
+.portfolio-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+.portfolio-table th, .portfolio-table td {
+  padding: 2px 6px;
+  border-bottom: 1px dotted var(--border);
+  text-align: right;
+}
+.portfolio-table th {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--amber-dim);
+  text-align: right;
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--bg-panel);
+  position: sticky;
+  top: 0;
+}
+.portfolio-table th.left, .portfolio-table td.left { text-align: left; }
+.portfolio-table td.ticker { color: var(--amber-bright); font-weight: 700; }
+.portfolio-table input,
+.portfolio-table select {
+  width: 100%;
+  border: 0;
+  padding: 1px 2px;
+  background: transparent;
+  color: var(--white);
+  text-align: right;
+  height: 16px;
+}
+.portfolio-table input.left { text-align: left; color: var(--amber-bright); font-weight: 700; }
+.portfolio-table .del {
+  border: 0; background: transparent; color: var(--red); padding: 0 4px;
+}
+.portfolio-table .del:hover { color: var(--red); background: var(--bg-hover); }
+
+.portfolio-footer {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 8px;
+  border-top: 1px solid var(--border);
+  font-size: 10.5px;
+  background: var(--bg-panel);
+}
+.portfolio-footer .summary {
+  color: var(--amber);
+  margin-right: auto;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.portfolio-footer .summary .val { color: var(--amber-bright); font-weight: 700; }
+
+/* ---------------------------------------------------------------
+   Agent trace
+   --------------------------------------------------------------- */
+.trace { font-size: 11px; }
+.trace-row {
+  display: grid;
+  grid-template-columns: 64px 76px 1fr;
+  gap: 8px;
+  padding: 2px 0;
+  border-bottom: 1px dotted var(--border);
+  align-items: baseline;
+}
+.trace-row .t  { color: var(--grey); font-size: 10px; }
+.trace-row .ev {
+  color: var(--bg);
+  background: var(--amber);
+  padding: 0 6px;
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  text-align: center;
+  letter-spacing: 0.06em;
+}
+.trace-row .ev.token   { background: var(--grey-dim); color: var(--white); }
+.trace-row .ev.meta    { background: var(--cyan);   color: var(--bg); }
+.trace-row .ev.structured { background: var(--amber); color: var(--bg); }
+.trace-row .ev.error   { background: var(--red);    color: var(--bg); }
+.trace-row .ev.done    { background: var(--green);  color: var(--bg); }
+.trace-row .ev.classif { background: var(--magenta); color: var(--bg); }
+.trace-row .ev.guard   { background: var(--red);    color: var(--bg); }
+.trace-row .ev.session { background: var(--amber-dim); color: var(--bg); }
+.trace-row .body { color: var(--white); white-space: pre-wrap; word-break: break-word; }
+.trace-row .body .k { color: var(--amber-dim); }
+.trace-row .body .v { color: var(--white); }
+
+/* ---------------------------------------------------------------
+   Misc helpers
+   --------------------------------------------------------------- */
+.kbd {
+  display: inline-block;
+  padding: 0 5px;
+  border: 1px solid var(--amber);
+  color: var(--bg);
+  background: var(--amber);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+.muted { color: var(--grey); }
+.fg-amber { color: var(--amber); }
+.fg-amber-bright { color: var(--amber-bright); }
+.fg-cyan { color: var(--cyan); }
+.fg-green { color: var(--green); }
+.fg-red { color: var(--red); }
+.fg-white { color: var(--white); }
+
+/* ---------------------------------------------------------------
+   ONBOARDING
+   First-run only. Full-screen overlay with the ice splash, then
+   name + portfolio prompts, then a 5-card capability tour. Stays
+   monochrome with the active theme - no shadows, no rounded
+   corners, same density as the rest of the terminal.
+   --------------------------------------------------------------- */
+
+.onb-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  color: var(--primary);
+  overflow: auto;
+  padding: 24px;
+}
+
+/* ----- splash stage: ICETEA title only ----- */
+.onb-splash {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  /* fade in once on mount - just a touch so it doesn't slam in */
+  animation: onb-fade-in 0.45s ease-out both;
+}
+@keyframes onb-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.onb-title-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+.onb-title {
+  color: var(--primary-bright);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: clamp(48px, 9vw, 96px);
+  letter-spacing: 0.42em;
+  line-height: 1;
+  padding-left: 0.42em;
+  /* gentle glow that pulses to suggest a live system, not a static logo */
+  text-shadow: 0 0 18px var(--primary-faint, transparent);
+  animation: onb-title-glow 3.2s ease-in-out infinite;
+}
+@keyframes onb-title-glow {
+  0%, 100% { opacity: 0.92; }
+  50%      { opacity: 1.0; }
+}
+.onb-title-rule {
+  width: clamp(180px, 32vw, 360px);
+  height: 1px;
+  background: var(--primary-dim);
+}
+.onb-tag {
+  color: var(--white);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+.onb-skip {
+  color: var(--grey);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  margin-top: 8px;
+}
+.onb-skip-target {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+/* ----- common card chrome for stages 2..4 ----- */
+.onb-card {
+  border: 1px solid var(--border-strong);
+  background: var(--bg-panel);
+  padding: 18px 22px;
+  width: 100%;
+  max-width: 540px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.onb-card.onb-wide {
+  max-width: 760px;
+}
+.onb-stage-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+.onb-stage-step {
+  color: var(--grey);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+.onb-stage-title {
+  color: var(--primary-bright);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.onb-prose {
+  color: var(--white);
+  font-size: 12px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.onb-form {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.onb-input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  color: var(--primary-bright);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 8px 10px;
+  outline: none;
+}
+.onb-input:focus {
+  border-color: var(--primary);
+}
+
+.onb-btn {
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  padding: 8px 14px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.onb-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--primary-bright);
+}
+.onb-btn:disabled {
+  color: var(--grey-dim);
+  border-color: var(--grey-dim);
+  cursor: not-allowed;
+}
+.onb-btn.primary {
+  border-color: var(--primary);
+  color: var(--primary-bright);
+}
+.onb-btn.primary:hover:not(:disabled) {
+  background: var(--bg-selected);
+}
+
+.onb-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.onb-hint {
+  color: var(--grey);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+/* ----- portfolio bucket grid ----- */
+.onb-bucket-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.onb-bucket {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--primary);
+  font-family: var(--font-mono);
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.onb-bucket:hover {
+  background: var(--bg-hover);
+}
+.onb-bucket.active {
+  border-color: var(--primary);
+  background: var(--bg-selected);
+  color: var(--primary-bright);
+}
+.onb-bucket-id {
+  color: var(--primary-bright);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+}
+.onb-bucket-desc {
+  color: var(--white);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.onb-bucket-stats {
+  color: var(--grey);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  margin-top: 4px;
+}
+
+/* ----- capability tour card ----- */
+.onb-card-head-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.onb-card-num {
+  color: var(--grey);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  font-family: var(--font-mono);
+}
+
+/* Animated dense-ASCII thumbnail. Sits centred in its own row so the
+   chart / chat / dock illustrations get full card width to breathe. */
+.onb-thumb-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  padding: 14px 12px;
+  overflow-x: auto;
+  /* faint inner scanline tint - reuses the global terminal vibe so the
+     thumbnails feel like a CRT preview of the actual feature */
+  background-image: linear-gradient(
+    180deg,
+    transparent 0,
+    transparent calc(var(--row) - 1px),
+    var(--scan-tint, transparent) calc(var(--row) - 1px),
+    var(--scan-tint, transparent) var(--row)
+  );
+  background-size: 100% var(--row);
+}
+.onb-thumb {
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.1;
+  letter-spacing: 0;
+  margin: 0;
+  white-space: pre;
+  text-shadow: 0 0 6px var(--primary-faint, transparent);
+}
+.onb-card-title {
+  color: var(--primary-bright);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+}
+.onb-card-bullets {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--white);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.onb-card-bullets li {
+  margin-bottom: 4px;
+}
+.onb-card-bullets li::marker {
+  color: var(--primary-dim);
+}
+.onb-card-kbd {
+  color: var(--cyan);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  border-top: 1px dashed var(--border);
+  padding-top: 6px;
+}
+
+.onb-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+.onb-dot {
+  width: 18px;
+  height: 4px;
+  background: var(--grey-dim);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.onb-dot.active {
+  background: var(--primary);
+}
+
+/* iPad and below: tighten paddings, shrink the gem so the splash fits */
+@media (max-width: 720px) {
+  .ice-art { font-size: 9px; }
+  .onb-card { padding: 14px 16px; }
+  .onb-bucket-grid { grid-template-columns: 1fr; }
+}

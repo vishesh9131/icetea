@@ -1,0 +1,83 @@
+{
+  "_about": "Demo investor profiles fetched at runtime by the Icetea terminal. Edit this file (or replace it with a backend response) without rebuilding the frontend. Schema mirrors UserContext in src/types.ts.",
+  "default": "concentrated",
+  "profiles": [
+    {
+      "id": "empty",
+      "label": "EMPTY — new investor, no positions",
+      "ctx": {
+        "user_id": "usr_new",
+        "name": "Vishesh",
+        "country": "IN",
+        "base_currency": "INR",
+        "risk_profile": "moderate",
+        "positions": [],
+        "preferences": { "preferred_benchmark": "S&P 500" }
+      }
+    },
+    {
+      "id": "concentrated",
+      "label": "CONCENTRATED — NVDA-heavy book",
+      "ctx": {
+        "user_id": "usr_conc",
+        "name": "Maya",
+        "country": "US",
+        "base_currency": "USD",
+        "risk_profile": "moderate",
+        "positions": [
+          { "ticker": "NVDA", "quantity": 35, "avg_cost": 218.40, "currency": "USD" },
+          { "ticker": "VTI",  "quantity": 25, "avg_cost": 218.50, "currency": "USD" },
+          { "ticker": "AAPL", "quantity": 8,  "avg_cost": 168.20, "currency": "USD" }
+        ],
+        "preferences": { "preferred_benchmark": "S&P 500" }
+      }
+    },
+    {
+      "id": "global",
+      "label": "GLOBAL — multi-currency book",
+      "ctx": {
+        "user_id": "usr_glob",
+        "name": "Daniel",
+        "country": "NL",
+        "base_currency": "EUR",
+        "risk_profile": "aggressive",
+        "positions": [
+          { "ticker": "AAPL",    "quantity": 10,  "avg_cost": 150, "currency": "USD" },
+          { "ticker": "ASML.AS", "quantity": 5,   "avg_cost": 600, "currency": "EUR" },
+          { "ticker": "HSBA.L",  "quantity": 200, "avg_cost": 6,   "currency": "GBP" }
+        ],
+        "preferences": { "preferred_benchmark": "MSCI World" }
+      }
+    },
+    {
+      "id": "penny",
+      "label": "PENNY — single penny stock",
+      "ctx": {
+        "user_id": "usr_penny",
+        "country": "US",
+        "base_currency": "USD",
+        "risk_profile": "aggressive",
+        "positions": [
+          { "ticker": "SNDL", "quantity": 5000, "avg_cost": 0.50, "currency": "USD" }
+        ]
+      }
+    },
+    {
+      "id": "bonds",
+      "label": "BONDS — defensive, low beta",
+      "ctx": {
+        "user_id": "usr_bond",
+        "name": "Pat",
+        "age": 70,
+        "country": "US",
+        "base_currency": "USD",
+        "risk_profile": "conservative",
+        "positions": [
+          { "ticker": "BND", "quantity": 500, "avg_cost": 72.0,  "currency": "USD" },
+          { "ticker": "TLT", "quantity": 100, "avg_cost": 95.0,  "currency": "USD" },
+          { "ticker": "AGG", "quantity": 200, "avg_cost": 100.0, "currency": "USD" }
+        ]
+      }
+    }
+  ]
+}
