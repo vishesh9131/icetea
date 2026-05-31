@@ -5,9 +5,8 @@ Netlify hosts the **static UI** (landing + terminal). The **Python API cannot ru
 ## Architecture
 
 ```
-Browser  →  icetea1.netlify.app/app/     (terminal UI)
-         →  icetea1.netlify.app/v1/*    (Netlify JS proxy)
-         →  icetea-api.onrender.com/v1/* (FastAPI)
+Browser  →  icetea1.netlify.app/app/           (terminal UI)
+         →  icetea-api.onrender.com/v1/*       (chat/API direct — avoids Netlify 26s proxy cap)
 ```
 
 ## Step 1 — Deploy backend on Render
@@ -23,14 +22,20 @@ Test: `curl https://icetea-api.onrender.com/healthz` → `{"status":"ok",...}`
 
 ## Step 2 — Netlify env
 
-In **icetea1** → Site configuration → Environment variables:
+| Variable | Value |
+|----------|--------|
+| `BACKEND_URL` | `https://icetea-api-4fjb.onrender.com` *(no trailing slash)* |
+
+Baked into the terminal at build time. LLM keys stay on **Render only**.
+
+On **Render → icetea-api → Environment**, also set:
 
 | Variable | Value |
 |----------|--------|
-| `BACKEND_URL` | `https://icetea-api.onrender.com` *(no trailing slash)* |
-| `LLM_PROVIDER`, `OPENAI_API_KEY`, etc. | **Not needed on Netlify** — only on Render |
+| `REQUEST_TIMEOUT_S` | `120` |
+| `LLM_PER_CALL_TIMEOUT_S` | `120` |
 
-Remove empty vars you don't use (`DATABASE_URL`, `REDIS_URL`, `PGVECTOR_DATABASE_URL` — this app doesn't need them).
+Then redeploy Render.
 
 ## Step 3 — Netlify build settings
 
@@ -63,8 +68,8 @@ make dev   # :8000 API + :5173 terminal — no proxy needed
 ## Free tier notes
 
 - **Render free**: spins down after ~15 min idle; first request is slow.
-- **Netlify proxy**: no 10s Python limit — SSE streams from Render through the JS proxy.
-- **COLLAB / long runs**: work on Render; not limited by Netlify function timeout.
+- **Netlify proxy**: 26s max — terminal now talks to Render **directly** (CORS via `ALLOWED_ORIGINS` on Render).
+- **COLLAB / long runs**: need `REQUEST_TIMEOUT_S=120` on Render.
 
 ## Legacy split sites
 

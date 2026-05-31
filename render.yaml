@@ -31,3 +31,7 @@ services:
         sync: false
       - key: ALLOWED_ORIGINS
         value: https://icetea1.netlify.app
+      - key: REQUEST_TIMEOUT_S
+        value: "120"
+      - key: LLM_PER_CALL_TIMEOUT_S
+        value: "120"

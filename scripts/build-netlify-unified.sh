@@ -18,15 +18,14 @@ cp -R dist/* "$DIST/"
 echo ">> terminal (/app)"
 cd "$ROOT/frontend"
 npm ci --no-audit --no-fund
-# Empty base = same-origin API in sseClient.ts; path prefix for assets
-VITE_BASE="/app/" VITE_BACKEND_BASE="" npm run build
+BACKEND="${BACKEND_URL:-https://icetea-api-4fjb.onrender.com}"
+BACKEND="${BACKEND%/}"
+# Call Render directly — Netlify proxy hard-caps at 26s and kills long SSE chat streams.
+VITE_BASE="/app/" VITE_BACKEND_BASE="$BACKEND" npm run build
 mkdir -p "$DIST/app"
 cp -R dist/* "$DIST/app/"
 
-# API proxy baked into publish dir (uses BACKEND_URL from Netlify build env)
-BACKEND="${BACKEND_URL:-https://icetea-api-4fjb.onrender.com}"
-BACKEND="${BACKEND%/}"
-echo ">> API proxy -> ${BACKEND}"
+echo ">> terminal API -> ${BACKEND} (direct, bypasses Netlify 26s proxy limit)"
 
 cat > "$DIST/_redirects" <<EOF
 /healthz ${BACKEND}/healthz 200!
