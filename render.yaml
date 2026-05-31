@@ -1,0 +1,33 @@
+# One-click deploy for the FastAPI backend (free tier).
+# After deploy, copy the service URL into Netlify env as BACKEND_URL.
+
+services:
+  - type: web
+    name: icetea-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: PYTHONPATH=. uvicorn icetea.api.app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: LLM_PROVIDER
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: VLLM_BASE_URL
+        sync: false
+      - key: VLLM_MODEL
+        sync: false
+      - key: VLLM_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: https://icetea1.netlify.app

@@ -1,5 +1,5 @@
-# Unified icetea: landing (/) + terminal (/app) + FastAPI (serverless function).
-# One Netlify site — no separate API host required for static + function routes.
+# Unified icetea: landing (/) + terminal (/app) + JS API proxy (/healthz, /v1/*).
+# Python FastAPI cannot run on Netlify — it lives on Render; functions proxy to BACKEND_URL.
 
 [build]
   command = "bash scripts/build-netlify-unified.sh"
@@ -8,30 +8,11 @@
 
 [build.environment]
   APP_ENV = "production"
-  # Writable session dir on Lambda (repo Logs/ is read-only in deploy)
-  SESSION_MEMORY_DIR = "/tmp/icetea-memory"
-  # Same-origin API when terminal is built without VITE_BACKEND_BASE
   VITE_TERMINAL_URL = "/app/"
 
 [functions]
   directory = "netlify/functions"
-
-[functions.server]
-  # Bundle python package + demo fixtures into the lambda zip
-  included_files = ["backend/icetea/**", "backend/fixtures/**"]
-
-# --- API (must be before SPA fallbacks) ------------------------------------
-[[redirects]]
-  from = "/healthz"
-  to = "/.netlify/functions/server"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/v1/*"
-  to = "/.netlify/functions/server"
-  status = 200
-  force = true
+  node_bundler = "esbuild"
 
 # --- Terminal SPA at /app ----------------------------------------------------
 [[redirects]]
@@ -44,7 +25,7 @@
   to = "/app/index.html"
   status = 200
 
-# --- Landing SPA at / ------------------------------------------------------
+# --- Landing SPA at / (after API function routes) --------------------------
 [[redirects]]
   from = "/*"
   to = "/index.html"
