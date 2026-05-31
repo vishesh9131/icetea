@@ -23,4 +23,12 @@ VITE_BASE="/app/" VITE_BACKEND_BASE="" npm run build
 mkdir -p "$DIST/app"
 cp -R dist/* "$DIST/app/"
 
+# Belt-and-suspenders: SPA + API rewrites (mirrors netlify.toml)
+cat > "$DIST/_redirects" <<'EOF'
+/healthz /.netlify/functions/server 200!
+/v1/* /.netlify/functions/server 200!
+/app/* /app/index.html 200
+/* /index.html 200
+EOF
+
 echo ">> done — publish $DIST"

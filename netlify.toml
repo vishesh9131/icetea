@@ -15,7 +15,9 @@
 
 [functions]
   directory = "netlify/functions"
-  # Ship backend package + fixtures the agents read in-process
+
+[functions.server]
+  # Bundle python package + demo fixtures into the lambda zip
   included_files = ["backend/icetea/**", "backend/fixtures/**"]
 
 # --- API (must be before SPA fallbacks) ------------------------------------

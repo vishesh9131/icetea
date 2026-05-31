@@ -49,7 +49,8 @@ export function loadProfiles(): Promise<Profile[]> {
   if (_loaded) return _loaded
   _loaded = (async () => {
     try {
-      const r = await fetch('/profiles.json', { cache: 'no-cache' })
+      const url = `${import.meta.env.BASE_URL}profiles.json`
+      const r = await fetch(url, { cache: 'no-cache' })
       if (!r.ok) throw new Error(`profiles.json ${r.status}`)
       const doc = (await r.json()) as ProfilesDoc
       if (!Array.isArray(doc.profiles) || doc.profiles.length === 0) {
@@ -66,7 +67,7 @@ export function loadProfiles(): Promise<Profile[]> {
       _profiles = [
         {
           id: 'missing',
-          label: 'MISSING — could not load /profiles.json',
+          label: `MISSING — could not load ${import.meta.env.BASE_URL}profiles.json`,
           ctx: {
             user_id: 'usr_missing',
             country: 'US',
