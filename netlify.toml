@@ -1,18 +1,27 @@
-# Unified icetea: landing (/) + terminal (/app) + JS API proxy (/healthz, /v1/*).
-# Python FastAPI cannot run on Netlify — it lives on Render; functions proxy to BACKEND_URL.
+# Unified icetea: landing (/) + terminal (/app) + API proxy to Render.
 
 [build]
   command = "bash scripts/build-netlify-unified.sh"
   publish = "dist"
-  functions = "netlify/functions"
 
 [build.environment]
   APP_ENV = "production"
   VITE_TERMINAL_URL = "/app/"
+  # Fallback if BACKEND_URL not set in Netlify UI at build time
+  BACKEND_URL = "https://icetea-api-4fjb.onrender.com"
 
-[functions]
-  directory = "netlify/functions"
-  node_bundler = "esbuild"
+# --- API: proxy to Render (must be before SPA fallbacks) -------------------
+[[redirects]]
+  from = "/healthz"
+  to = "https://icetea-api-4fjb.onrender.com/healthz"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/v1/*"
+  to = "https://icetea-api-4fjb.onrender.com/v1/:splat"
+  status = 200
+  force = true
 
 # --- Terminal SPA at /app ----------------------------------------------------
 [[redirects]]
@@ -25,7 +34,7 @@
   to = "/app/index.html"
   status = 200
 
-# --- Landing SPA at / (after API function routes) --------------------------
+# --- Landing SPA at / --------------------------------------------------------
 [[redirects]]
   from = "/*"
   to = "/index.html"

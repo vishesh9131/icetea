@@ -23,8 +23,14 @@ VITE_BASE="/app/" VITE_BACKEND_BASE="" npm run build
 mkdir -p "$DIST/app"
 cp -R dist/* "$DIST/app/"
 
-# SPA fallbacks only — /healthz and /v1/* are handled by netlify/functions/*.mjs
-cat > "$DIST/_redirects" <<'EOF'
+# API proxy baked into publish dir (uses BACKEND_URL from Netlify build env)
+BACKEND="${BACKEND_URL:-https://icetea-api-4fjb.onrender.com}"
+BACKEND="${BACKEND%/}"
+echo ">> API proxy -> ${BACKEND}"
+
+cat > "$DIST/_redirects" <<EOF
+/healthz ${BACKEND}/healthz 200!
+/v1/* ${BACKEND}/v1/:splat 200!
 /app/* /app/index.html 200
 /* /index.html 200
 EOF
