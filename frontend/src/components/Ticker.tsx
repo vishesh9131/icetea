@@ -6,6 +6,10 @@ import { fetchTape, type TapeItem } from '../sseClient'
 // cycles per minute, which keeps the ribbon feeling alive without spamming
 // uvicorn from every tab on every focus change.
 const POLL_MS = 30_000
+// when we're in an error state (backend just booted, transient blip, etc)
+// we burst-poll on a short backoff so the ribbon recovers in seconds rather
+// than waiting the full 30s window.
+const ERROR_BACKOFF_MS = [2_000, 4_000, 8_000, 15_000]
 
 type State = {
   items: TapeItem[]
@@ -21,20 +25,29 @@ export function Ticker() {
 
   useEffect(() => {
     let stopped = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+    // failures back to back - used to walk up the backoff table so we don't
+    // hammer the backend if it's actually down, but recover fast if it's
+    // just starting up.
+    let failStreak = 0
     const tick = async () => {
       const data = await fetchTape()
       if (stopped) return
+      let nextDelay: number
       if (data && Array.isArray(data.items) && data.items.length > 0) {
         lastGoodRef.current = data.items
         setState({ items: data.items, stale: !!data.stale, offline: false, loading: false })
+        failStreak = 0
+        nextDelay = POLL_MS
       } else {
-        // fetch failed - keep last good if we have one
         setState({ items: lastGoodRef.current, stale: true, offline: true, loading: false })
+        nextDelay = ERROR_BACKOFF_MS[Math.min(failStreak, ERROR_BACKOFF_MS.length - 1)]
+        failStreak += 1
       }
+      timer = setTimeout(tick, nextDelay)
     }
     tick()
-    const id = setInterval(tick, POLL_MS)
-    return () => { stopped = true; clearInterval(id) }
+    return () => { stopped = true; if (timer) clearTimeout(timer) }
   }, [])
 
   // Doubling the list is what gives the marquee its seamless loop in CSS.

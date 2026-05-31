@@ -51,3 +51,10 @@ local_benchmarks.tar.gz
 
 # Harness reports (.json / .md run dumps) — regenerate by running the harness.
 backend/Logs/
+
+# Local Netlify folder
+.netlify
+
+# Raw branding dumps (landing site ships trimmed copies under Landing-site/public/)
+icetea_branding/
+*.mov

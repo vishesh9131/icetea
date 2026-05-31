@@ -1,0 +1,11 @@
+# Superseded by root netlify.toml (unified landing + terminal + API).
+# Kept for split-site deploys only.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

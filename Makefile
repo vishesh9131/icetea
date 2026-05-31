@@ -21,7 +21,7 @@ BACKEND_PY ?= $(shell \
 
 UVICORN    := $(BACKEND_PY) -m uvicorn icetea.api.app:app --host 127.0.0.1 --port 8000
 
-.PHONY: help install dev backend frontend test test-fast harness harness-c build clean kill
+.PHONY: help install dev backend frontend test test-fast harness harness-c build netlify-build clean kill
 
 help:
 	@echo "icetea — monorepo wrapper"
@@ -35,6 +35,7 @@ help:
 	@echo "  make harness      79 e2e scenarios, sequential"
 	@echo "  make harness-c    79 e2e scenarios, --concurrency 4"
 	@echo "  make build        frontend production build"
+	@echo "  make netlify-build landing + terminal + dist/ for unified Netlify"
 	@echo "  make clean        node_modules, dist, pycache, harness logs"
 	@echo "  make kill         kill any uvicorn/vite on :8000/:5173"
 	@echo ""
@@ -72,6 +73,9 @@ harness-c:
 
 build:
 	cd $(FRONTEND) && npm run build
+
+netlify-build:
+	bash $(ROOT)/scripts/build-netlify-unified.sh
 
 clean:
 	@echo ">> frontend"

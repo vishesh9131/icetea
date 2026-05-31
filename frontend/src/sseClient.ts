@@ -24,10 +24,18 @@ export type StreamHandle = {
 const DEFAULT_BASE = 'http://127.0.0.1:8000'
 
 function backendBase(): string {
-  // Allow VITE_BACKEND_BASE override (e.g. behind a tunnel); otherwise local.
-  // import.meta.env exists at build time under Vite.
-  const fromEnv = (import.meta as any)?.env?.VITE_BACKEND_BASE
-  return (fromEnv && typeof fromEnv === 'string' && fromEnv.trim()) || DEFAULT_BASE
+  const fromEnv = (import.meta as any)?.env?.VITE_BACKEND_BASE as string | undefined
+  if (fromEnv && fromEnv.trim()) {
+    return fromEnv.trim().replace(/\/$/, '')
+  }
+  // Unified Netlify deploy: terminal at /app, API at same origin (/v1, /healthz)
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname
+    if (host !== 'localhost' && host !== '127.0.0.1') {
+      return window.location.origin
+    }
+  }
+  return DEFAULT_BASE
 }
 
 export function streamChat(

@@ -5,6 +5,10 @@ import type { UserContext } from '../types'
 type Mode = 'market' | 'portfolio'
 
 const REFRESH_MS = 60_000 // backend caches 5 min per ticker; we poll once a minute
+// short backoff sequence we walk up while the news endpoint is unreachable
+// (e.g. user opened the UI before uvicorn finished booting). Recovers in
+// ~2s once the backend comes online instead of waiting the full minute.
+const ERROR_BACKOFF_MS = [2_000, 4_000, 8_000, 15_000, 30_000]
 
 type Props = {
   ctx: UserContext
@@ -27,6 +31,8 @@ export function NewsPanel({ ctx, onOpenArticle }: Props) {
 
   useEffect(() => {
     let stopped = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let failStreak = 0
     const run = async () => {
       setLoading(true)
       setError(null)
@@ -34,21 +40,28 @@ export function NewsPanel({ ctx, onOpenArticle }: Props) {
         ? await fetchMarketNews()
         : await fetchPortfolioNews(tickerKey.split(',').filter(Boolean))
       if (stopped) return
+      let nextDelay = REFRESH_MS
       if (!data) {
+        // backend unreachable - keep whatever items we already had on screen
+        // (don't blank them out) and retry on the short backoff so we
+        // recover within a couple seconds when the api comes back.
         setError('news endpoint unreachable')
-        setItems([])
+        nextDelay = ERROR_BACKOFF_MS[Math.min(failStreak, ERROR_BACKOFF_MS.length - 1)]
+        failStreak += 1
       } else if (mode === 'portfolio' && (!data.tickers || data.tickers.length === 0)) {
         setError('no positions in this profile')
         setItems([])
+        failStreak = 0
       } else {
         setItems(data.items || [])
         setAsOf(data.as_of)
+        failStreak = 0
       }
       setLoading(false)
+      timer = setTimeout(run, nextDelay)
     }
     run()
-    const id = setInterval(run, REFRESH_MS)
-    return () => { stopped = true; clearInterval(id) }
+    return () => { stopped = true; if (timer) clearTimeout(timer) }
   }, [mode, tickerKey])
 
   return (
