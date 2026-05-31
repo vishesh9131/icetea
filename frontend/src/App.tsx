@@ -55,6 +55,17 @@ function writeSavedProvider(p: LlmProviderId | null) {
   } catch { /* ignore */ }
 }
 
+// thinking models sometimes leave a stub token stream ("19.88" etc) while the
+// real narrative lives on structured.message — use it when streamed text is thin
+function narrativeFromStructured(text: string, payload: unknown): string {
+  if (!payload || typeof payload !== 'object') return text
+  const msg = (payload as { message?: unknown }).message
+  if (typeof msg !== 'string' || !msg.trim()) return text
+  const t = text.trim()
+  if (!t || t.length < 100) return msg.trim()
+  return text
+}
+
 function readOnboardingFlag(): boolean {
   try {
     return window.localStorage.getItem(ONBOARDING_KEY) === '1'
@@ -422,7 +433,12 @@ export function App() {
             if (stage === 'classified' && agent) {
               setLastAgent(String(agent))
               setMessages((prev) => prev.map((m) => m.id === botId
-                ? { ...m, agent: String(agent) } : m))
+                ? {
+                    ...m,
+                    agent: String(agent),
+                    progress: { stage: 'agent', agent: String(agent) },
+                  }
+                : m))
               pushTrace({ kind: 'classif', label: 'CLASSIF', body: kvSummary(pl) })
               return
             }
@@ -430,10 +446,20 @@ export function App() {
             return
           }
           if (ev.kind === 'structured') {
-            const agent = (ev.payload as any).agent || lastAgent
-            setMessages((prev) => prev.map((m) => m.id === botId
-              ? { ...m, structured: ev.payload, agent: agent ? String(agent) : m.agent }
-              : m))
+            const payload = ev.payload as Record<string, unknown>
+            const agent = (payload as any).agent || lastAgent
+            setMessages((prev) => prev.map((m) => {
+              if (m.id !== botId) return m
+              const text = narrativeFromStructured(m.text, payload)
+              return {
+                ...m,
+                structured: payload,
+                agent: agent ? String(agent) : m.agent,
+                text,
+                thinkingOpen: false,
+                progress: null,
+              }
+            }))
             pushTrace({ kind: 'structured', label: 'STRUCT', body: kvSummary(ev.payload, ['agent', 'intent', 'mode', 'implemented']) })
             return
           }
@@ -461,9 +487,18 @@ export function App() {
           if (ev.kind === 'done') {
             const latency = Date.now() - start
             setLastLatency(latency)
-            setMessages((prev) => prev.map((m) => m.id === botId
-              ? { ...m, streaming: false, latencyMs: latency, progress: null }
-              : m))
+            setMessages((prev) => prev.map((m) => {
+              if (m.id !== botId) return m
+              const text = narrativeFromStructured(m.text, m.structured)
+              return {
+                ...m,
+                streaming: false,
+                latencyMs: latency,
+                progress: null,
+                text,
+                thinkingOpen: false,
+              }
+            }))
             pushTrace({ kind: 'done', label: 'DONE', body: `${(latency/1000).toFixed(2)}s · ${kvSummary(ev.payload)}` })
             return
           }
@@ -487,9 +522,17 @@ export function App() {
             return
           }
           // graceful close with no `done` event - mark stream finished
-          setMessages((prev) => prev.map((m) => m.id === botId
-            ? { ...m, streaming: false, latencyMs: m.latencyMs ?? (Date.now() - start) }
-            : m))
+          setMessages((prev) => prev.map((m) => {
+            if (m.id !== botId) return m
+            const text = narrativeFromStructured(m.text, m.structured)
+            return {
+              ...m,
+              streaming: false,
+              latencyMs: m.latencyMs ?? (Date.now() - start),
+              text,
+              thinkingOpen: false,
+            }
+          }))
         },
       },
     )

@@ -611,6 +611,7 @@ class RiskAssessmentAgent:
             user=_build_narrative_user_msg(query, structured),
         )
         had_content = False
+        content_len = 0
         try:
             # bumped from 320 -> 700 so thinking-capable models still have a
             # token budget left for the actual answer after the CoT pass
@@ -621,6 +622,7 @@ class RiskAssessmentAgent:
                     yield {"type": "thinking", "delta": piece}
                     continue
                 had_content = True
+                content_len += len(piece)
                 yield {"type": "data", "delta": piece}
         except LLMError as exc:
             logger.warning("Risk Assessment LLM narrative failed: %s", exc)
@@ -628,8 +630,9 @@ class RiskAssessmentAgent:
             for chunk in _split_for_stream(intro):
                 yield {"type": "data", "delta": chunk}
             had_content = True
+            content_len = len(intro)
 
-        if not had_content:
+        if not had_content or content_len < 100:
             # The model spent its entire budget thinking and never emitted an
             # answer. Fall back to the deterministic narrative so the user is
             # not left with a thinking-only bubble.
